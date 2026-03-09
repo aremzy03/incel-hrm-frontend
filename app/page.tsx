@@ -1,65 +1,234 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useId } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
+import { Eye, EyeOff, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import type { LoginRequest, AuthResponse } from "@/lib/types/auth";
+
+const fieldClass =
+  "w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition";
+
+function BrandPanel() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="relative hidden lg:flex lg:w-[46%] flex-col justify-between overflow-hidden bg-primary p-12">
+      <div className="absolute -right-32 -top-32 h-[420px] w-[420px] rounded-full bg-white/5" />
+      <div className="absolute -bottom-28 -left-28 h-[360px] w-[360px] rounded-full bg-white/5" />
+      <div className="absolute left-1/2 top-1/2 h-[560px] w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.03]" />
+      <div className="absolute right-20 top-1/3 h-24 w-24 rounded-full bg-white/[0.07]" />
+
+      <div className="relative z-10 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15">
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+            <path d="M12 3L4 19h16L12 3Z" fill="white" />
+            <path d="M12 3L4 19h8V3Z" fill="white" opacity="0.5" />
+          </svg>
+        </div>
+        <div className="leading-none">
+          <p className="font-serif font-semibold text-lg text-white">Incel Group</p>
+          <p className="text-[10px] uppercase tracking-widest text-white/60">HR Portal</p>
+        </div>
+      </div>
+
+      <div className="relative z-10 space-y-5">
+        <h2 className="font-serif text-[2.5rem] font-semibold leading-snug text-white">
+          Manage your people,
+          <br />
+          not your paperwork.
+        </h2>
+        <p className="max-w-xs text-sm leading-relaxed text-white/70">
+          A unified platform for leave management, appraisals, staff loans, and
+          more — built for growing organisations.
+        </p>
+
+        <div className="flex flex-wrap gap-2 pt-2">
+          {["Leave Management", "Staff Appraisals", "Loan Tracking"].map((f) => (
+            <span
+              key={f}
+              className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-white/80"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              {f}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <p className="relative z-10 text-xs text-white/40">
+        &copy; {new Date().getFullYear()} Incel Group. All rights reserved.
+      </p>
+    </div>
+  );
+}
+
+async function loginFn(payload: LoginRequest): Promise<AuthResponse> {
+  const res = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    const message =
+      typeof data?.detail === "string"
+        ? data.detail
+        : data?.email?.[0] || data?.password?.[0] || "Login failed. Please check your credentials.";
+    throw new Error(message);
+  }
+  return data;
+}
+
+export default function LoginPage() {
+  const uid = useId();
+  const router = useRouter();
+  const { login } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: loginFn,
+    onSuccess: (data) => {
+      login(data.user);
+      router.push("/leave");
+    },
+    onError: (err: Error) => {
+      setError(err.message);
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim() || !password) {
+      setError("Both fields are required.");
+      return;
+    }
+    setError(null);
+    mutation.mutate({ email: email.trim(), password });
+  }
+
+  return (
+    <div className="flex min-h-screen">
+      <BrandPanel />
+
+      <div className="flex flex-1 items-center justify-center bg-background px-6 py-12">
+        <div className="w-full max-w-[360px]">
+          <div className="mb-8 flex items-center gap-2.5 lg:hidden">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+                <path d="M12 3L4 19h16L12 3Z" fill="white" />
+                <path d="M12 3L4 19h8V3Z" fill="white" opacity="0.5" />
+              </svg>
+            </div>
+            <span className="font-serif font-semibold text-base text-foreground">
+              Incel Group
+            </span>
+          </div>
+
+          <h1 className="text-2xl font-semibold text-foreground">Welcome back</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Sign in to your HR Portal account.
+          </p>
+
+          {error && (
+            <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
+            <div>
+              <label
+                htmlFor={`${uid}-email`}
+                className="mb-1.5 block text-sm font-medium text-foreground"
+              >
+                Email address
+              </label>
+              <input
+                id={`${uid}-email`}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@organisation.com"
+                autoComplete="email"
+                className={fieldClass}
+                required
+              />
+            </div>
+
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label
+                  htmlFor={`${uid}-password`}
+                  className="text-sm font-medium text-foreground"
+                >
+                  Password
+                </label>
+                <Link
+                  href="#"
+                  className="text-xs text-primary hover:underline"
+                  tabIndex={-1}
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <input
+                  id={`${uid}-password`}
+                  type={showPwd ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  className={cn(fieldClass, "pr-11")}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPwd((v) => !v)}
+                  aria-label={showPwd ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
+                >
+                  {showPwd ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Learning
-            </a>{" "}
-            center.
+              {mutation.isPending ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+              ) : (
+                <>
+                  Sign in
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            Don&apos;t have an account?{" "}
+            <Link
+              href="/register"
+              className="font-medium text-primary hover:underline"
+            >
+              Create account
+            </Link>
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
