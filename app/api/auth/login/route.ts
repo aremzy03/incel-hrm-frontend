@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const jar = await cookies();
   jar.set("hrm_access", tokens.access, {
     ...COOKIE_OPTIONS,
-    maxAge: 60 * 5, // 5 minutes
+    maxAge: 60 * 60 * 24, // 24 hours
   });
   jar.set("hrm_refresh", tokens.refresh, {
     ...COOKIE_OPTIONS,

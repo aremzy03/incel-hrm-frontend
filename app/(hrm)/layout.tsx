@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -14,16 +14,20 @@ import {
   Sun,
   Moon,
   Bell,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { canManageUsers } from "@/lib/rbac";
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 
-const activeModules = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+const BASE_MODULES = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, disabled: true },
   { label: "Leave Management", href: "/leave", icon: CalendarDays },
 ];
+
+const USERS_MODULE = { label: "Users", href: "/users", icon: Users };
 
 const soonModules = [
   { label: "Staff Loans", icon: DollarSign },
@@ -46,6 +50,14 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [dark, setDark] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const activeModules = useMemo(
+    () =>
+      canManageUsers(user)
+        ? [...BASE_MODULES, USERS_MODULE]
+        : BASE_MODULES,
+    [user]
+  );
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -119,6 +131,18 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
                 ? pathname === "/leave" || pathname.startsWith("/leave/")
                 : pathname === item.href ||
                   pathname.startsWith(item.href + "/");
+
+            if ("disabled" in item && item.disabled) {
+              return (
+                <div
+                  key={item.href}
+                  className="flex cursor-not-allowed select-none items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-muted-foreground opacity-50"
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  {item.label}
+                </div>
+              );
+            }
 
             return (
               <Link
@@ -209,6 +233,19 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
                   ? pathname === "/leave" || pathname.startsWith("/leave/")
                   : pathname === item.href ||
                     pathname.startsWith(item.href + "/");
+
+              if ("disabled" in item && item.disabled) {
+                return (
+                  <div
+                    key={item.href}
+                    className="flex cursor-not-allowed select-none items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground opacity-50"
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    {item.label}
+                  </div>
+                );
+              }
+
               return (
                 <Link
                   key={item.href}

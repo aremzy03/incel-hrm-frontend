@@ -7,15 +7,56 @@ import { Paperclip, CheckCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
 import { apiGet, apiPost, ApiError } from "@/lib/api-client";
+import { useDepartmentMembers } from "@/lib/api/departments";
+import { useLeaveTypes } from "@/lib/api/leave-types";
+import { useAuth } from "@/contexts/AuthContext";
 import type {
   LeaveType,
   LeaveBalance,
   LeaveRequest,
   LeaveRequestCreatePayload,
+  LeaveStatus,
   PaginatedResponse,
 } from "@/lib/types/leave";
 
 const APPROVAL_STEPS = ["Line Manager", "HR Department", "Executive Director"];
+
+const VALIDATION_FIELDS = [
+  "leave_balance",
+  "leave_request",
+  "leave_type",
+  "cover_person",
+  "end_date",
+] as const;
+
+function getValidationMessage(data: Record<string, unknown> | undefined): string {
+  if (!data) return "";
+  const extract = (v: unknown): string | null => {
+    if (typeof v === "string") return v;
+    if (Array.isArray(v) && v.length > 0 && typeof v[0] === "string") return v[0];
+    return null;
+  };
+  for (const field of VALIDATION_FIELDS) {
+    const msg = extract(data[field]);
+    if (msg) return msg;
+  }
+  const detail = extract(data.detail);
+  if (detail) return detail;
+  const firstArray = Object.values(data).find(
+    (v) => Array.isArray(v) && v.length > 0 && typeof v[0] === "string"
+  ) as string[] | undefined;
+  return firstArray?.[0] ?? "";
+}
+
+function isLeaveTypeEligible(
+  leaveTypeName: string,
+  gender: string | undefined
+): boolean {
+  const n = leaveTypeName.toLowerCase();
+  if (n.includes("maternity")) return gender === "FEMALE";
+  if (n.includes("paternity")) return gender === "MALE";
+  return true;
+}
 
 function countWorkingDays(startStr: string, endStr: string): number {
   if (!startStr || !endStr) return 0;
@@ -31,6 +72,44 @@ function countWorkingDays(startStr: string, endStr: string): number {
     cursor.setDate(cursor.getDate() + 1);
   }
   return count;
+}
+
+const OVERLAP_STATUSES: LeaveStatus[] = [
+  "DRAFT",
+  "PENDING_MANAGER",
+  "PENDING_HR",
+  "PENDING_ED",
+  "APPROVED",
+];
+
+function datesOverlap(
+  aStart: string,
+  aEnd: string,
+  bStart: string,
+  bEnd: string
+): boolean {
+  const aS = new Date(aStart).getTime();
+  const aE = new Date(aEnd).getTime();
+  const bS = new Date(bStart).getTime();
+  const bE = new Date(bEnd).getTime();
+  return aS <= bE && bS <= aE;
+}
+
+function hasOverlappingRequest(
+  requests: LeaveRequest[],
+  startDate: string,
+  endDate: string
+): LeaveRequest | null {
+  for (const r of requests) {
+    if (!OVERLAP_STATUSES.includes(r.status as LeaveStatus)) continue;
+    if (datesOverlap(r.start_date, r.end_date, startDate, endDate)) return r;
+  }
+  return null;
+}
+
+function isAnnualOrCasual(name: string): boolean {
+  const n = name.toLowerCase();
+  return n.includes("annual") || n.includes("casual");
 }
 
 const fieldClass =
@@ -92,22 +171,32 @@ function BalanceBar({
 export default function ApplyLeavePage() {
   const formId = useId();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const [leaveTypeId, setLeaveTypeId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
+  const [coverPersonId, setCoverPersonId] = useState("");
   const [fileName, setFileName] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [overlapConfirmOpen, setOverlapConfirmOpen] = useState(false);
 
-  const { data: leaveTypesRaw, isLoading: typesLoading } = useQuery({
-    queryKey: ["leave-types"],
-    queryFn: () =>
-      apiGet<PaginatedResponse<LeaveType> | LeaveType[]>("leave-types"),
-  });
+  const deptId =
+    typeof user?.department === "string"
+      ? user.department
+      : user?.department?.id ?? null;
+
+  const { data: leaveTypesRaw, isLoading: typesLoading } = useLeaveTypes();
+  const { data: departmentMembers = [] } = useDepartmentMembers(deptId ?? "");
 
   const currentYear = new Date().getFullYear();
+  const { data: myRequestsRaw } = useQuery({
+    queryKey: ["my-leave-requests"],
+    queryFn: () =>
+      apiGet<PaginatedResponse<LeaveRequest> | LeaveRequest[]>("leave-requests"),
+  });
   const { data: balancesRaw } = useQuery({
     queryKey: ["leave-balances", currentYear],
     queryFn: () =>
@@ -116,16 +205,36 @@ export default function ApplyLeavePage() {
       ),
   });
 
-  const leaveTypes: LeaveType[] = Array.isArray(leaveTypesRaw)
-    ? leaveTypesRaw
-    : leaveTypesRaw?.results ?? [];
+  const allLeaveTypes: LeaveType[] = leaveTypesRaw ?? [];
+  const leaveTypes = allLeaveTypes.filter((t) =>
+    isLeaveTypeEligible(t.name, user?.gender)
+  );
+
+  const coverOptions = departmentMembers.filter((m) => m.id !== user?.id);
+
+  const myRequests: LeaveRequest[] = Array.isArray(myRequestsRaw)
+    ? myRequestsRaw
+    : myRequestsRaw?.results ?? [];
+
+  const selectedLeaveType = leaveTypes.find((t) => t.id === leaveTypeId);
+  const showAnnualCasualHint =
+    selectedLeaveType && isAnnualOrCasual(selectedLeaveType.name);
 
   const balances: LeaveBalance[] = Array.isArray(balancesRaw)
     ? balancesRaw
     : balancesRaw?.results ?? [];
 
   const workingDays = countWorkingDays(startDate, endDate);
-  const canSubmit = leaveTypeId !== "" && startDate !== "" && endDate !== "";
+
+  const noDepartment = !deptId;
+  const noCoverOptions = deptId && coverOptions.length === 0;
+  const canSubmit =
+    !noDepartment &&
+    !noCoverOptions &&
+    leaveTypeId !== "" &&
+    startDate !== "" &&
+    endDate !== "" &&
+    coverPersonId !== "";
 
   const createMutation = useMutation({
     mutationFn: async (payload: LeaveRequestCreatePayload) => {
@@ -137,15 +246,13 @@ export default function ApplyLeavePage() {
       setSubmitted(true);
       setApiError(null);
       queryClient.invalidateQueries({ queryKey: ["leave-requests-recent"] });
+      queryClient.invalidateQueries({ queryKey: ["my-leave-requests"] });
       queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const data = err.data;
-        const firstFieldError = Object.values(data).find(
-          (v) => Array.isArray(v) && v.length > 0
-        ) as string[] | undefined;
-        setApiError(firstFieldError?.[0] ?? err.message);
+        const msg = getValidationMessage(err.data as Record<string, unknown>);
+        setApiError(msg || err.message);
       } else {
         setApiError("Something went wrong. Please try again.");
       }
@@ -157,9 +264,7 @@ export default function ApplyLeavePage() {
     setFileName(file ? file.name : null);
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!canSubmit) return;
+  function doSubmit() {
     setApiError(null);
     createMutation.mutate({
       leave_type: leaveTypeId,
@@ -167,7 +272,28 @@ export default function ApplyLeavePage() {
       end_date: endDate,
       reason,
       is_emergency: false,
+      cover_person: coverPersonId,
     });
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    const overlap = hasOverlappingRequest(myRequests, startDate, endDate);
+    if (overlap) {
+      setOverlapConfirmOpen(true);
+      return;
+    }
+    doSubmit();
+  }
+
+  function handleOverlapConfirm() {
+    setOverlapConfirmOpen(false);
+    doSubmit();
+  }
+
+  function handleOverlapCancel() {
+    setOverlapConfirmOpen(false);
   }
 
   return (
@@ -195,6 +321,14 @@ export default function ApplyLeavePage() {
               Submit a request for approval by your Line Manager, HR, and
               Executive Director.
             </p>
+
+            {(noDepartment || noCoverOptions) && (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                {noDepartment
+                  ? "You must be assigned to a department to apply for leave."
+                  : "No other members in your department to act as cover."}
+              </div>
+            )}
 
             {apiError && (
               <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -231,7 +365,49 @@ export default function ApplyLeavePage() {
                     ))}
                   </select>
                 )}
+                {showAnnualCasualHint && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Only one person per department can have overlapping Annual or
+                    Casual leave.{" "}
+                    <Link
+                      href="/leave/calendar"
+                      className="text-primary hover:underline"
+                    >
+                      Check the calendar
+                    </Link>
+                  </p>
+                )}
               </div>
+
+              {deptId && (
+                <div>
+                  <FieldLabel htmlFor={`${formId}-cover`}>
+                    Cover person
+                  </FieldLabel>
+                  {coverOptions.length === 0 ? (
+                    <div className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+                      No other members in your department.
+                    </div>
+                  ) : (
+                    <select
+                      id={`${formId}-cover`}
+                      value={coverPersonId}
+                      onChange={(e) => setCoverPersonId(e.target.value)}
+                      className={cn(fieldClass, "cursor-pointer")}
+                      required
+                    >
+                      <option value="" disabled>
+                        Select cover person
+                      </option>
+                      {coverOptions.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.full_name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -426,6 +602,44 @@ export default function ApplyLeavePage() {
           </div>
         </div>
       </div>
+
+      {/* Overlap confirmation modal */}
+      {overlapConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleOverlapCancel();
+          }}
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="text-base font-semibold text-foreground">
+              Overlapping leave dates
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              You have an existing leave request that overlaps these dates.
+              Proceed anyway?
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={handleOverlapCancel}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleOverlapConfirm}
+                disabled={createMutation.isPending}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+              >
+                {createMutation.isPending && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Proceed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -58,7 +58,7 @@ async function proxyRequest(
     if (newAccess) {
       jar.set("hrm_access", newAccess, {
         ...COOKIE_OPTIONS,
-        maxAge: 60 * 5,
+        maxAge: 60 * 60 * 24, // 24 hours
       });
       headers["Authorization"] = `Bearer ${newAccess}`;
       res = await fetch(targetUrl, {

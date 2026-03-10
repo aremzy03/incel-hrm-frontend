@@ -75,6 +75,19 @@ export interface LeaveRequestCreatePayload {
   end_date: string;
   reason: string;
   is_emergency: boolean;
+  cover_person: string;
+}
+
+export interface LeaveTypeCreatePayload {
+  name: string;
+  description?: string;
+  default_days: number;
+}
+
+export interface LeaveTypeUpdatePayload {
+  name?: string;
+  description?: string;
+  default_days?: number;
 }
 
 export interface PaginatedResponse<T> {

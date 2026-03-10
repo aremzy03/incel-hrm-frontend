@@ -139,6 +139,8 @@ async function registerFn(payload: RegisterRequest) {
           data?.password?.[0] ||
           data?.password_confirm?.[0] ||
           data?.department?.[0] ||
+          data?.gender?.[0] ||
+          data?.date_of_birth?.[0] ||
           "Registration failed. Please try again.";
     throw new Error(message);
   }
@@ -152,6 +154,8 @@ export default function RegisterPage() {
     lastName: "",
     email: "",
     department: "",
+    gender: "" as "" | "MALE" | "FEMALE",
+    dateOfBirth: "",
     password: "",
     confirmPassword: "",
   });
@@ -174,7 +178,7 @@ export default function RegisterPage() {
     },
   });
 
-  function update(field: keyof typeof form, value: string) {
+  function update<K extends keyof typeof form>(field: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
   }
@@ -187,6 +191,8 @@ export default function RegisterPage() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       errs.email = "Enter a valid email address.";
     if (!form.department) errs.department = "Please select a department.";
+    if (!form.gender) errs.gender = "Please select your gender.";
+    if (!form.dateOfBirth) errs.dateOfBirth = "Date of birth is required.";
     if (!form.password) errs.password = "Password is required.";
     else if (form.password.length < 8)
       errs.password = "Password must be at least 8 characters.";
@@ -210,6 +216,8 @@ export default function RegisterPage() {
       password_confirm: form.confirmPassword,
       first_name: form.firstName.trim(),
       last_name: form.lastName.trim(),
+      gender: form.gender,
+      date_of_birth: form.dateOfBirth,
       department: form.department || undefined,
     });
   }
@@ -381,6 +389,58 @@ export default function RegisterPage() {
               {errors.department && (
                 <p className="mt-1 text-xs text-destructive">{errors.department}</p>
               )}
+            </div>
+
+            {/* Gender & Date of birth */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor={`${uid}-gender`}
+                  className="mb-1.5 block text-sm font-medium text-foreground"
+                >
+                  Gender
+                </label>
+                <select
+                  id={`${uid}-gender`}
+                  value={form.gender}
+                  onChange={(e) => update("gender", e.target.value as "" | "MALE" | "FEMALE")}
+                  className={cn(
+                    fieldClass,
+                    "appearance-none cursor-pointer",
+                    errors.gender && "border-destructive focus:ring-destructive/30"
+                  )}
+                >
+                  <option value="">Select gender</option>
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                </select>
+                {errors.gender && (
+                  <p className="mt-1 text-xs text-destructive">{errors.gender}</p>
+                )}
+              </div>
+              <div>
+                <label
+                  htmlFor={`${uid}-dob`}
+                  className="mb-1.5 block text-sm font-medium text-foreground"
+                >
+                  Date of birth
+                </label>
+                <input
+                  id={`${uid}-dob`}
+                  type="date"
+                  value={form.dateOfBirth}
+                  onChange={(e) => update("dateOfBirth", e.target.value)}
+                  min="1920-01-01"
+                  max={new Date().toISOString().slice(0, 10)}
+                  className={cn(
+                    fieldClass,
+                    errors.dateOfBirth && "border-destructive focus:ring-destructive/30"
+                  )}
+                />
+                {errors.dateOfBirth && (
+                  <p className="mt-1 text-xs text-destructive">{errors.dateOfBirth}</p>
+                )}
+              </div>
             </div>
 
             {/* Password */}
