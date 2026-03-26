@@ -21,12 +21,20 @@ const PAGE_SIZE = 5;
 
 const ALL_STATUSES: LeaveStatus[] = [
   "DRAFT",
+  "PENDING_SUPERVISOR",
   "PENDING_MANAGER",
   "PENDING_HR",
   "PENDING_ED",
   "APPROVED",
   "REJECTED",
   "CANCELLED",
+];
+
+/** Statuses from which the owner can cancel their leave request */
+const CANCELLABLE_BY_OWNER: LeaveStatus[] = [
+  "DRAFT",
+  "PENDING_SUPERVISOR",
+  "PENDING_MANAGER",
 ];
 
 const TABLE_COLUMNS = [
@@ -239,9 +247,9 @@ export default function LeaveHistoryPage() {
                     </span>
                   ),
                   status: <StatusBadge status={row.status} />,
-                  action:
-                    row.status === "PENDING_MANAGER" ||
-                    row.status === "DRAFT" ? (
+                  action: CANCELLABLE_BY_OWNER.includes(
+                    row.status as LeaveStatus
+                  ) ? (
                       <button
                         onClick={() => setCancelTarget(row)}
                         className="rounded-md border border-destructive px-2 py-1 text-xs text-destructive transition hover:bg-destructive/10"

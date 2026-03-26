@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useId } from "react";
+import { useMemo, useState, useId } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Paperclip, CheckCircle, Loader2 } from "lucide-react";
@@ -10,6 +10,10 @@ import { apiGet, apiPost, ApiError } from "@/lib/api-client";
 import { useDepartmentMembers } from "@/lib/api/departments";
 import { useLeaveTypes } from "@/lib/api/leave-types";
 import { useAuth } from "@/contexts/AuthContext";
+import { HolidayDatePicker } from "@/components/hrm/leave/HolidayDatePicker";
+import { listPublicHolidays } from "@/lib/api/public-holidays";
+import { buildHolidayLookup, countWorkingDaysPreview } from "@/lib/public-holidays/utils";
+import type { PublicHoliday } from "@/lib/types/public-holidays";
 import type {
   LeaveType,
   LeaveBalance,
@@ -19,7 +23,12 @@ import type {
   PaginatedResponse,
 } from "@/lib/types/leave";
 
-const APPROVAL_STEPS = ["Line Manager", "HR Department", "Executive Director"];
+const APPROVAL_STEPS = [
+  "Unit Supervisor (if applicable)",
+  "Line Manager",
+  "HR Department",
+  "Executive Director",
+];
 
 const VALIDATION_FIELDS = [
   "leave_balance",
@@ -76,6 +85,7 @@ function countWorkingDays(startStr: string, endStr: string): number {
 
 const OVERLAP_STATUSES: LeaveStatus[] = [
   "DRAFT",
+  "PENDING_SUPERVISOR",
   "PENDING_MANAGER",
   "PENDING_HR",
   "PENDING_ED",
@@ -224,7 +234,47 @@ export default function ApplyLeavePage() {
     ? balancesRaw
     : balancesRaw?.results ?? [];
 
-  const workingDays = countWorkingDays(startDate, endDate);
+  const startYear = startDate ? new Date(startDate + "T00:00:00").getFullYear() : currentYear;
+  const endYear = endDate ? new Date(endDate + "T00:00:00").getFullYear() : startYear;
+  const holidayYears = startYear === endYear ? [startYear] : [startYear, endYear];
+
+  const { data: holidaysA } = useQuery({
+    queryKey: ["public-holidays", holidayYears[0]],
+    queryFn: () => listPublicHolidays(holidayYears[0]),
+  });
+  const { data: holidaysB } = useQuery({
+    queryKey: ["public-holidays", holidayYears[1]],
+    queryFn: () => listPublicHolidays(holidayYears[1]),
+    enabled: holidayYears.length > 1,
+  });
+
+  const holidaysMerged = useMemo(() => {
+    const toList = (raw: unknown): PublicHoliday[] =>
+      Array.isArray(raw)
+        ? (raw as PublicHoliday[])
+        : ((raw as { results?: PublicHoliday[] } | undefined)?.results ?? []);
+    const a = toList(holidaysA);
+    const b = toList(holidaysB);
+    const byDate = new Map<string, PublicHoliday>();
+    for (const h of [...a, ...b]) {
+      if (!byDate.has(h.date)) byDate.set(h.date, h);
+    }
+    return Array.from(byDate.values());
+  }, [holidaysA, holidaysB]);
+
+  const { dateSet: holidaySet, nameByDate: holidayNameByDate } = useMemo(
+    () => buildHolidayLookup(holidaysMerged),
+    [holidaysMerged]
+  );
+
+  const workingDays =
+    startDate && endDate
+      ? countWorkingDaysPreview(
+          new Date(startDate + "T00:00:00"),
+          new Date(endDate + "T00:00:00"),
+          holidaySet
+        )
+      : 0;
 
   const noDepartment = !deptId;
   const noCoverOptions = deptId && coverOptions.length === 0;
@@ -235,12 +285,39 @@ export default function ApplyLeavePage() {
     startDate !== "" &&
     endDate !== "" &&
     coverPersonId !== "";
+  const canSaveDraft = canSubmit;
 
-  const createMutation = useMutation({
+  const createDraftMutation = useMutation({
     mutationFn: async (payload: LeaveRequestCreatePayload) => {
       const created = await apiPost<LeaveRequest>("leave-requests", payload);
-      await apiPost<LeaveRequest>(`leave-requests/${created.id}/submit`);
       return created;
+    },
+    onSuccess: (created) => {
+      setApiError(null);
+      queryClient.invalidateQueries({ queryKey: ["leave-requests-recent"] });
+      queryClient.invalidateQueries({ queryKey: ["my-leave-requests"] });
+      const id =
+        (created as { id?: string }).id ?? (created as { pk?: string }).pk;
+      if (id) {
+        window.location.href = `/leave/requests/${id}`;
+      }
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const msg = getValidationMessage(err.data as Record<string, unknown>);
+        setApiError(msg || err.message);
+      } else {
+        setApiError("Something went wrong. Please try again.");
+      }
+    },
+  });
+
+  const createAndSubmitMutation = useMutation({
+    mutationFn: async (payload: LeaveRequestCreatePayload) => {
+      return apiPost<LeaveRequest>(
+        "leave-requests/create-and-submit/",
+        payload
+      );
     },
     onSuccess: () => {
       setSubmitted(true);
@@ -264,16 +341,23 @@ export default function ApplyLeavePage() {
     setFileName(file ? file.name : null);
   }
 
+  const payload: LeaveRequestCreatePayload = {
+    leave_type: leaveTypeId,
+    start_date: startDate,
+    end_date: endDate,
+    reason,
+    is_emergency: false,
+    cover_person: coverPersonId,
+  };
+
+  function doSaveDraft() {
+    setApiError(null);
+    createDraftMutation.mutate(payload);
+  }
+
   function doSubmit() {
     setApiError(null);
-    createMutation.mutate({
-      leave_type: leaveTypeId,
-      start_date: startDate,
-      end_date: endDate,
-      reason,
-      is_emergency: false,
-      cover_person: coverPersonId,
-    });
+    createAndSubmitMutation.mutate(payload);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -308,7 +392,7 @@ export default function ApplyLeavePage() {
 
       <PageHeader
         title="Apply for Leave"
-        subtitle="Submit a request for approval by your Line Manager, HR, and Executive Director."
+        subtitle="Submit a request for approval. Approvals may include Unit Supervisor (if applicable), Line Manager, HR, and Executive Director."
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -318,7 +402,8 @@ export default function ApplyLeavePage() {
               New Leave Request
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Submit a request for approval by your Line Manager, HR, and
+              Submit a request for approval. Depending on your Unit, a Unit
+              Supervisor may approve first before your Line Manager, HR, and
               Executive Director.
             </p>
 
@@ -414,25 +499,24 @@ export default function ApplyLeavePage() {
                   <FieldLabel htmlFor={`${formId}-start`}>
                     Start Date
                   </FieldLabel>
-                  <input
-                    id={`${formId}-start`}
-                    type="date"
+                  <HolidayDatePicker
+                    label="Start date"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className={fieldClass}
-                    required
+                    onChange={(next) => {
+                      setStartDate(next);
+                      if (endDate && next && endDate < next) setEndDate(next);
+                    }}
+                    holidayNameByDate={holidayNameByDate}
                   />
                 </div>
                 <div>
                   <FieldLabel htmlFor={`${formId}-end`}>End Date</FieldLabel>
-                  <input
-                    id={`${formId}-end`}
-                    type="date"
+                  <HolidayDatePicker
+                    label="End date"
                     value={endDate}
+                    onChange={setEndDate}
                     min={startDate || undefined}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className={fieldClass}
-                    required
+                    holidayNameByDate={holidayNameByDate}
                   />
                 </div>
               </div>
@@ -504,22 +588,44 @@ export default function ApplyLeavePage() {
                 <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
                   <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
                   <span>
-                    Your leave request has been submitted and is awaiting Line
-                    Manager approval.
+                    Your leave request has been submitted and is now awaiting
+                    approval.
                   </span>
                 </div>
               ) : (
-                <button
-                  type="submit"
-                  disabled={!canSubmit || createMutation.isPending}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {createMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Submit Leave Request"
-                  )}
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={doSaveDraft}
+                    disabled={
+                      !canSaveDraft ||
+                      createDraftMutation.isPending ||
+                      createAndSubmitMutation.isPending
+                    }
+                    className="order-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:order-1"
+                  >
+                    {createDraftMutation.isPending ? (
+                      <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                    ) : (
+                      "Save as draft"
+                    )}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={
+                      !canSubmit ||
+                      createAndSubmitMutation.isPending ||
+                      createDraftMutation.isPending
+                    }
+                    className="order-1 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:order-2"
+                  >
+                    {createAndSubmitMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Submit Leave Request"
+                    )}
+                  </button>
+                </div>
               )}
             </form>
           </div>
@@ -549,8 +655,9 @@ export default function ApplyLeavePage() {
               </div>
 
               <div className="mt-4 rounded-lg bg-accent p-3 text-xs text-accent-foreground">
-                Leave requests follow a 3-stage approval: Line Manager &rarr; HR &rarr;
-                Executive Director. Rejection at any stage ends the process.
+                Leave requests follow a staged approval: Unit Supervisor (if
+                applicable) &rarr; Line Manager &rarr; HR &rarr; Executive
+                Director. Rejection at any stage ends the process.
               </div>
             </div>
 
@@ -628,10 +735,10 @@ export default function ApplyLeavePage() {
               </button>
               <button
                 onClick={handleOverlapConfirm}
-                disabled={createMutation.isPending}
+                disabled={createAndSubmitMutation.isPending}
                 className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
               >
-                {createMutation.isPending && (
+                {createAndSubmitMutation.isPending && (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 )}
                 Proceed

@@ -9,6 +9,7 @@ import {
   FileText,
   CheckCircle,
   CalendarDays,
+  CalendarRange,
   Tags,
   ChevronLeft,
   ChevronRight,
@@ -21,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 type RoleName =
   | "EMPLOYEE"
   | "LINE_MANAGER"
+  | "SUPERVISOR"
   | "HR"
   | "EXECUTIVE_DIRECTOR"
   | "MANAGING_DIRECTOR";
@@ -43,9 +45,21 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: "Approvals",
     href: "/leave/admin",
     icon: CheckCircle,
-    allowedRoles: ["HR"],
+    allowedRoles: [
+      "SUPERVISOR",
+      "LINE_MANAGER",
+      "HR",
+      "EXECUTIVE_DIRECTOR",
+      "MANAGING_DIRECTOR",
+    ],
   },
   { label: "Calendar", href: "/leave/calendar", icon: CalendarDays },
+  {
+    label: "Public Holidays",
+    href: "/leave/public-holidays",
+    icon: CalendarRange,
+    allowedRoles: HR_ROLES,
+  },
   {
     label: "Leave Types",
     href: "/leave/types",

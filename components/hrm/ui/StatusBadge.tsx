@@ -16,6 +16,7 @@ const STYLE_MAP: Record<string, string> = {
   Cancelled: "bg-muted text-muted-foreground",
   DRAFT: "bg-secondary text-secondary-foreground",
   Draft: "bg-secondary text-secondary-foreground",
+  PENDING_SUPERVISOR: "bg-yellow-100 text-yellow-700",
   PENDING_MANAGER: "bg-yellow-100 text-yellow-700",
   PENDING_HR: "bg-yellow-100 text-yellow-700",
   PENDING_ED: "bg-yellow-100 text-yellow-700",

@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Users, Building2, ShieldCheck } from "lucide-react";
+import { Users, Building2, ShieldCheck, LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UsersTab } from "@/components/hrm/users/UsersTab";
 import { DepartmentsTab } from "@/components/hrm/users/DepartmentsTab";
 import { RolesTab } from "@/components/hrm/users/RolesTab";
+import { UnitsTab } from "@/components/hrm/users/UnitsTab";
 
 const TABS = [
   { id: "users", label: "Users", icon: Users },
   { id: "departments", label: "Departments", icon: Building2 },
+  { id: "units", label: "Units", icon: LayoutGrid },
   { id: "roles", label: "Roles", icon: ShieldCheck },
 ] as const;
 
@@ -53,6 +55,7 @@ export default function UsersPage() {
       <div>
         {activeTab === "users" && <UsersTab />}
         {activeTab === "departments" && <DepartmentsTab />}
+        {activeTab === "units" && <UnitsTab />}
         {activeTab === "roles" && <RolesTab />}
       </div>
     </div>

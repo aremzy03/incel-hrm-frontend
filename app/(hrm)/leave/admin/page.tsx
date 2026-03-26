@@ -9,7 +9,9 @@ import { StatusBadge } from "@/components/hrm/ui/StatusBadge";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
 import { DataTable } from "@/components/hrm/ui/DataTable";
 import { apiGet, apiPost, ApiError } from "@/lib/api-client";
+import { useAuth } from "@/contexts/AuthContext";
 import { LEAVE_STATUS_DISPLAY } from "@/lib/types/leave";
+import { canUserActOnLeaveRequest } from "@/lib/leave/approval";
 import type {
   LeaveRequest,
   LeaveStatus,
@@ -24,12 +26,14 @@ interface ModalState {
 }
 
 const PENDING_STATUSES: LeaveStatus[] = [
+  "PENDING_SUPERVISOR",
   "PENDING_MANAGER",
   "PENDING_HR",
   "PENDING_ED",
 ];
 
 const FILTER_STATUSES: LeaveStatus[] = [
+  "PENDING_SUPERVISOR",
   "PENDING_MANAGER",
   "PENDING_HR",
   "PENDING_ED",
@@ -184,6 +188,7 @@ function ConfirmModal({
 
 export default function AdminApprovalsPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const { data: requestsRaw, isLoading } = useQuery({
     queryKey: ["admin-leave-requests"],
@@ -384,9 +389,10 @@ export default function AdminApprovalsPage() {
               columns={TABLE_COLUMNS}
               emptyMessage="No leave requests match the selected filters."
               rows={filtered.map((row) => {
-                const isPending = PENDING_STATUSES.includes(
-                  row.status as LeaveStatus
-                );
+                const status = row.status as LeaveStatus;
+                const isPending = PENDING_STATUSES.includes(status);
+                const { canApprove, canReject } = canUserActOnLeaveRequest(user, row);
+                const showActions = isPending && canApprove && canReject;
                 return {
                   employee: (
                     <div className="flex items-center gap-3">
@@ -431,7 +437,7 @@ export default function AdminApprovalsPage() {
                     </span>
                   ),
                   status: <StatusBadge status={row.status} />,
-                  action: isPending ? (
+                  action: showActions ? (
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() =>

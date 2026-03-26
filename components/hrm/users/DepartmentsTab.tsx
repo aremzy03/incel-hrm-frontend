@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Pencil, Trash2, UserCheck, UserX, Users } from "lucide-react";
+import Link from "next/link";
+import { Plus, Pencil, Trash2, UserCheck, UserX, Users, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useDepartments,
@@ -349,6 +350,9 @@ export function DepartmentsTab() {
                     <td className="px-4 py-3 text-muted-foreground">{getMemberCount(d.id)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        <Link href={`/departments/${d.id}`} title="View department" className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                          <ExternalLink className="h-4 w-4" />
+                        </Link>
                         <button onClick={() => setMembersDept(d)} title="View members" className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground">
                           <Users className="h-4 w-4" />
                         </button>

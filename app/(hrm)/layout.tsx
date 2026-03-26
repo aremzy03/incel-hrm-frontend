@@ -13,12 +13,12 @@ import {
   X,
   Sun,
   Moon,
-  Bell,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { canManageUsers } from "@/lib/rbac";
+import { NotificationsBell } from "@/components/hrm/notifications/NotificationsBell";
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 
@@ -53,20 +53,16 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
 
   const activeModules = useMemo(
     () =>
-      canManageUsers(user)
-        ? [...BASE_MODULES, USERS_MODULE]
-        : BASE_MODULES,
+      [
+        ...BASE_MODULES,
+        ...(canManageUsers(user) ? [USERS_MODULE] : []),
+      ],
     [user]
   );
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
-
-  // Close mobile menu on navigation
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -87,7 +83,11 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
         </button>
 
         {/* Logo */}
-        <Link href="/leave" className="flex shrink-0 items-center gap-2.5 mr-2">
+        <Link
+          href="/leave"
+          onClick={() => setMobileOpen(false)}
+          className="flex shrink-0 items-center gap-2.5 mr-2"
+        >
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <svg
               viewBox="0 0 24 24"
@@ -188,13 +188,7 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
 
-          <button
-            aria-label="Notifications"
-            className="relative rounded-md p-1.5 text-sidebar-foreground transition hover:bg-sidebar-accent"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-sidebar" />
-          </button>
+          <NotificationsBell />
         </div>
 
         {/* Vertical divider */}
@@ -202,9 +196,14 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
 
         {/* User pill */}
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-            {user ? getInitials(user.full_name) : "??"}
-          </div>
+          <Link
+            href="/profile"
+            className="flex items-center gap-2 rounded-lg transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
+            aria-label="View profile"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+              {user ? getInitials(user.full_name) : "??"}
+            </div>
           <div className="hidden leading-none sm:block">
             <p className="text-sm font-medium text-sidebar-foreground">
               {user?.full_name ?? "Loading..."}
@@ -213,6 +212,7 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
               {user?.roles?.[0] ?? ""}
             </p>
           </div>
+          </Link>
           <button
             aria-label="Logout"
             onClick={() => logout()}
@@ -250,6 +250,7 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => setMobileOpen(false)}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition",
                     isActive

@@ -7,6 +7,7 @@ import {
 } from "@/lib/api-client";
 import type {
   Department,
+  DepartmentDetailResponse,
   DepartmentPayload,
   LineManagerPayload,
   PaginatedResponse,
@@ -33,6 +34,15 @@ export function useDepartmentMembers(deptId: string) {
       );
       return Array.isArray(data) ? data : data?.results ?? [];
     },
+    enabled: !!deptId,
+  });
+}
+
+export function useDepartmentDetail(deptId: string) {
+  return useQuery<DepartmentDetailResponse>({
+    queryKey: ["department-detail", deptId],
+    queryFn: () =>
+      apiGet<DepartmentDetailResponse>(`departments/${deptId}/detail`),
     enabled: !!deptId,
   });
 }

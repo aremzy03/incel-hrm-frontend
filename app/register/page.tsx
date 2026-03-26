@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Eye, EyeOff, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { RegisterRequest, Department } from "@/lib/types/auth";
+import type { RegisterRequest, Department, Gender } from "@/lib/types/auth";
 
 const fieldClass =
   "w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition";
@@ -161,7 +161,9 @@ export default function RegisterPage() {
   });
   const [showPwd, setShowPwd] = useState(false);
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
-  const [errors, setErrors] = useState<Partial<typeof form & { form: string }>>({});
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof typeof form | "form", string>>
+  >({});
   const [success, setSuccess] = useState(false);
 
   const { data: departments = [], isLoading: deptLoading } = useQuery({
@@ -216,7 +218,7 @@ export default function RegisterPage() {
       password_confirm: form.confirmPassword,
       first_name: form.firstName.trim(),
       last_name: form.lastName.trim(),
-      gender: form.gender,
+      gender: form.gender as Gender,
       date_of_birth: form.dateOfBirth,
       department: form.department || undefined,
     });

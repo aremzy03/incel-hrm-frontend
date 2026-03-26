@@ -29,7 +29,7 @@ async function proxyRequest(
   params: { path: string[] }
 ): Promise<NextResponse> {
   const jar = await cookies();
-  let accessToken = jar.get("hrm_access")?.value;
+  const accessToken = jar.get("hrm_access")?.value;
   const refreshToken = jar.get("hrm_refresh")?.value;
 
   const targetPath = params.path.join("/");

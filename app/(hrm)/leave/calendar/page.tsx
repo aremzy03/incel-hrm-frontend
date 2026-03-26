@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
 import { apiGet } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
+import { listPublicHolidays } from "@/lib/api/public-holidays";
+import { buildHolidayLookup, isWeekend, toYmd } from "@/lib/public-holidays/utils";
+import type { PublicHoliday } from "@/lib/types/public-holidays";
 import type { CalendarEntry, PaginatedResponse } from "@/lib/types/leave";
 
 type ViewMode = "my" | "team";
@@ -194,6 +197,20 @@ export default function LeaveCalendarPage() {
       ),
   });
 
+  const { data: holidaysRaw } = useQuery({
+    queryKey: ["public-holidays", year],
+    queryFn: () => listPublicHolidays(year),
+  });
+
+  const holidays: PublicHoliday[] = Array.isArray(holidaysRaw)
+    ? holidaysRaw
+    : (holidaysRaw as { results?: PublicHoliday[] } | undefined)?.results ?? [];
+
+  const { nameByDate: holidayNameByDate } = useMemo(
+    () => buildHolidayLookup(holidays),
+    [holidays]
+  );
+
   const entries: CalendarEntry[] = Array.isArray(entriesRaw)
     ? entriesRaw
     : entriesRaw?.results ?? [];
@@ -351,6 +368,8 @@ export default function LeaveCalendarPage() {
               const overflow = cellEvents.length - CHIP_LIMIT;
               const isSelected =
                 selectedDate !== null && isSameDay(cell.date, selectedDate);
+              const weekend = isWeekend(cell.date);
+              const holidayName = holidayNameByDate.get(toYmd(cell.date));
 
               return (
                 <button
@@ -361,17 +380,25 @@ export default function LeaveCalendarPage() {
                   className={cn(
                     "relative min-h-[80px] border-t border-border p-1.5 text-left transition",
                     cell.isCurrentMonth ? "bg-card hover:bg-muted/30" : "bg-muted/20",
+                    weekend && "bg-amber-50/60 dark:bg-amber-950/20",
                     isToday(cell.date) &&
                       cell.isCurrentMonth &&
                       "border-primary bg-primary/10",
                     isSelected && "ring-2 ring-inset ring-primary"
                   )}
+                  title={holidayName ? `Public holiday: ${holidayName}` : undefined}
                   aria-label={cell.date.toLocaleDateString("en-GB", {
                     weekday: "long",
                     day: "numeric",
                     month: "long",
                   })}
                 >
+                  {holidayName && (
+                    <span
+                      className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-card"
+                      aria-label={`Public holiday: ${holidayName}`}
+                    />
+                  )}
                   <span
                     className={cn(
                       "mb-1 block text-sm font-medium leading-none",
@@ -385,6 +412,18 @@ export default function LeaveCalendarPage() {
                   >
                     {cell.date.getDate()}
                   </span>
+
+                  {holidayName && (
+                    <span
+                      className={cn(
+                        "mb-1 block truncate rounded-sm px-1 py-0.5 text-[10px] font-semibold leading-tight",
+                        "bg-red-500/10 text-red-700 dark:bg-red-500/15 dark:text-red-200"
+                      )}
+                      title={holidayName}
+                    >
+                      {holidayName}
+                    </span>
+                  )}
 
                   <div className="space-y-0.5">
                     {cellEvents.slice(0, CHIP_LIMIT).map((ev) => (

@@ -1,5 +1,6 @@
 export type LeaveStatus =
   | "DRAFT"
+  | "PENDING_SUPERVISOR"
   | "PENDING_MANAGER"
   | "PENDING_HR"
   | "PENDING_ED"
@@ -9,6 +10,7 @@ export type LeaveStatus =
 
 export const LEAVE_STATUS_DISPLAY: Record<LeaveStatus, string> = {
   DRAFT: "Draft",
+  PENDING_SUPERVISOR: "Pending Unit Supervisor",
   PENDING_MANAGER: "Pending Manager",
   PENDING_HR: "Pending HR",
   PENDING_ED: "Pending ED",
@@ -22,6 +24,8 @@ export interface EmployeeMinimal {
   email: string;
   first_name: string;
   last_name: string;
+  /** Unit the employee belongs to (when exposed by API, for supervisor approval check) */
+  unit?: { id: string } | null;
 }
 
 export interface LeaveType {
@@ -55,6 +59,8 @@ export interface LeaveRequest {
   status_display: string;
   created_at: string;
   updated_at: string;
+  /** Present when backend includes it (e.g. for DRAFT) */
+  cover_person?: string | { id: string };
 }
 
 export interface LeaveApprovalLog {

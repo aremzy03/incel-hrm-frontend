@@ -1,6 +1,7 @@
 export type RoleName =
   | "EMPLOYEE"
   | "LINE_MANAGER"
+  | "SUPERVISOR"
   | "HR"
   | "EXECUTIVE_DIRECTOR"
   | "MANAGING_DIRECTOR";
@@ -26,6 +27,10 @@ export interface User {
   is_active: boolean;
   roles: string[];
   department: string | { id: string; name: string } | null;
+  /** Unit the user belongs to (when exposed by API) */
+  unit?: { id: string; name: string } | null;
+  /** Unit the user supervises (when user has SUPERVISOR role and API exposes it) */
+  supervised_unit?: { id: string; name?: string } | null;
   date_joined: string;
   updated_at: string;
 }
@@ -45,6 +50,24 @@ export interface Department {
   line_manager: string | UserMinimal | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface Unit {
+  id: string;
+  name: string;
+  department: { id: string; name: string };
+  supervisor: UserMinimal | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UnitCreatePayload {
+  name: string;
+  department: string;
+}
+
+export interface UnitUpdatePayload {
+  name?: string;
 }
 
 // ─── Payload types ──────────────────────────────────────────────────────────
@@ -90,6 +113,27 @@ export interface LineManagerPayload {
 
 export interface DepartmentChangePayload {
   department: string;
+}
+
+/** User-editable profile fields only (PATCH /auth/profile/) */
+export interface ProfileUpdatePayload {
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  gender?: Gender;
+  date_of_birth?: string | null;
+}
+
+/** Department detail response: department + members + units */
+export interface DepartmentDetailResponse {
+  department: Department;
+  members: UserMinimal[];
+  units: (Unit & { members: UserMinimal[] })[];
+}
+
+/** Unit detail with members (GET /units/:id/) */
+export interface UnitDetail extends Unit {
+  members: UserMinimal[];
 }
 
 // ─── Auth types ─────────────────────────────────────────────────────────────
