@@ -20,6 +20,16 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## CI: Docker image published to GHCR
+
+On every push to `main`, GitHub Actions builds and publishes a Docker image to GitHub Container Registry (GHCR):
+
+- `ghcr.io/<owner>/<repo>:<git-sha>`
+- `ghcr.io/<owner>/<repo>:latest`
+
+If publishing fails with permissions errors, ensure repository settings allow the workflow token to write packages:
+`Settings → Actions → General → Workflow permissions → Read and write permissions`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

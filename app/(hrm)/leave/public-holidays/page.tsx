@@ -13,7 +13,7 @@ export default function LeavePublicHolidaysPage() {
   const canAccess = hasRole(user, "HR", "EXECUTIVE_DIRECTOR", "MANAGING_DIRECTOR");
 
   const [file, setFile] = useState<File | null>(null);
-  const [result, setResult] = useState<unknown>(null);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -26,7 +26,7 @@ export default function LeavePublicHolidaysPage() {
     setResult(null);
     try {
       const r = await uploadPublicHolidaysCsv(file);
-      setResult(r);
+      setResult((r ?? {}) as Record<string, unknown>);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
