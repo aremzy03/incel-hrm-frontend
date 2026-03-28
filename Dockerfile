@@ -13,6 +13,8 @@ RUN npm run build
 
 FROM node:20-alpine AS runtime
 ENV NODE_ENV=production
+# Docker sets HOSTNAME to the container ID; Next uses HOSTNAME for bind address (see next/dist/build/utils.js).
+ENV HOSTNAME=0.0.0.0
 WORKDIR /app
 
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001 -G nodejs
