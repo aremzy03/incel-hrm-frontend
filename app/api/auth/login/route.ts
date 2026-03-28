@@ -1,14 +1,13 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
+import {
+  HRM_ACCESS_MAX_AGE,
+  HRM_COOKIE_OPTIONS,
+  HRM_REFRESH_MAX_AGE,
+} from "@/lib/hrmSession";
 
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  path: "/",
-};
+const API_URL = process.env.NEXT_PUBLIC_API_URL!;
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -41,12 +40,12 @@ export async function POST(req: NextRequest) {
 
   const jar = await cookies();
   jar.set("hrm_access", tokens.access, {
-    ...COOKIE_OPTIONS,
-    maxAge: 60 * 60 * 24, // 24 hours
+    ...HRM_COOKIE_OPTIONS,
+    maxAge: HRM_ACCESS_MAX_AGE,
   });
   jar.set("hrm_refresh", tokens.refresh, {
-    ...COOKIE_OPTIONS,
-    maxAge: 60 * 60 * 24, // 1 day
+    ...HRM_COOKIE_OPTIONS,
+    maxAge: HRM_REFRESH_MAX_AGE,
   });
 
   return NextResponse.json({ user });

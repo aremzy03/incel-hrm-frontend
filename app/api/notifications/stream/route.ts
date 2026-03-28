@@ -1,24 +1,8 @@
 import { cookies } from "next/headers";
 
+import { applyRefreshedTokensToJar, fetchRefreshedTokens } from "@/lib/hrmSession";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL!;
-
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  path: "/",
-};
-
-async function refreshAccessToken(refreshToken: string): Promise<string | null> {
-  const res = await fetch(`${API_URL}/auth/token/refresh/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh: refreshToken }),
-  });
-  if (!res.ok) return null;
-  const data = await res.json().catch(() => ({}));
-  return (data as { access?: string }).access ?? null;
-}
 
 async function fetchStream(accessToken?: string | null) {
   const headers: Record<string, string> = {
@@ -46,13 +30,10 @@ export async function GET() {
   let upstream = await fetchStream(accessToken);
 
   if (upstream.status === 401 && refreshToken) {
-    const newAccess = await refreshAccessToken(refreshToken);
-    if (newAccess) {
-      jar.set("hrm_access", newAccess, {
-        ...COOKIE_OPTIONS,
-        maxAge: 60 * 60 * 24,
-      });
-      accessToken = newAccess;
+    const tokens = await fetchRefreshedTokens(refreshToken);
+    if (tokens) {
+      applyRefreshedTokensToJar(jar, tokens);
+      accessToken = tokens.access;
       upstream = await fetchStream(accessToken);
     } else {
       jar.delete("hrm_access");
@@ -82,4 +63,3 @@ export async function GET() {
     headers,
   });
 }
-
