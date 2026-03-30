@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
-import { useRoles, useCreateRole, useUpdateRole, useDeleteRole } from "@/lib/api/roles";
+import { Pencil, Trash2 } from "lucide-react";
+import { useRoles, useUpdateRole, useDeleteRole } from "@/lib/api/roles";
 import type { Role, RolePayload } from "@/lib/types/auth";
 
 // ─── Overlay ──────────────────────────────────────────────────────────────────
@@ -27,7 +27,6 @@ interface RoleFormModalProps {
 }
 
 function RoleFormModal({ mode, role, onClose }: RoleFormModalProps) {
-  const createRole = useCreateRole();
   const updateRole = useUpdateRole(role?.id ?? "");
 
   const [form, setForm] = useState<RolePayload>({
@@ -35,7 +34,7 @@ function RoleFormModal({ mode, role, onClose }: RoleFormModalProps) {
     description: role?.description ?? "",
   });
   const [error, setError] = useState<string | null>(null);
-  const isPending = createRole.isPending || updateRole.isPending;
+  const isPending = updateRole.isPending;
 
   const fieldCls =
     "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition";
@@ -44,8 +43,7 @@ function RoleFormModal({ mode, role, onClose }: RoleFormModalProps) {
     e.preventDefault();
     setError(null);
     try {
-      if (mode === "create") await createRole.mutateAsync(form);
-      else await updateRole.mutateAsync(form);
+      await updateRole.mutateAsync(form);
       onClose();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -180,7 +178,6 @@ export function RolesTab() {
   const { data: rolesData, isLoading } = useRoles();
   const deleteRole = useDeleteRole();
 
-  const [createOpen, setCreateOpen] = useState(false);
   const [editRole, setEditRole] = useState<Role | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Role | null>(null);
 
@@ -193,12 +190,6 @@ export function RolesTab() {
         <p className="text-sm text-muted-foreground">
           {roles.length} role{roles.length !== 1 ? "s" : ""}
         </p>
-        <button
-          onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
-        >
-          <Plus className="h-4 w-4" /> Add role
-        </button>
       </div>
 
       {/* Cards grid */}
@@ -251,7 +242,6 @@ export function RolesTab() {
       )}
 
       {/* Modals */}
-      {createOpen && <RoleFormModal mode="create" onClose={() => setCreateOpen(false)} />}
       {editRole && <RoleFormModal mode="edit" role={editRole} onClose={() => setEditRole(null)} />}
       {deleteTarget && (
         <ConfirmDelete
