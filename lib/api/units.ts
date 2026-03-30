@@ -40,7 +40,7 @@ export function useCreateUnit() {
     mutationFn: (payload: UnitCreatePayload) =>
       apiPost<Unit>("units/", payload),
     onSuccess: (_, variables) => {
-      qc.invalidateQueries({ queryKey: ["units", variables.department] });
+      qc.invalidateQueries({ queryKey: ["units", variables.department_id] });
       qc.invalidateQueries({ queryKey: ["departments"] });
     },
   });

@@ -57,7 +57,7 @@ function UnitFormModal({
 
   const [form, setForm] = useState<UnitCreatePayload & UnitUpdatePayload>({
     name: unit?.name ?? "",
-    department: departmentId,
+    department_id: departmentId,
   });
   const [error, setError] = useState<string | null>(null);
   const isPending = createUnit.isPending || updateUnit.isPending;
@@ -70,7 +70,10 @@ function UnitFormModal({
     setError(null);
     try {
       if (mode === "create") {
-        await createUnit.mutateAsync({ name: form.name, department: departmentId });
+        await createUnit.mutateAsync({
+          name: form.name,
+          department_id: departmentId,
+        });
       } else {
         await updateUnit.mutateAsync({ name: form.name });
       }

@@ -63,11 +63,12 @@ export interface Unit {
 
 export interface UnitCreatePayload {
   name: string;
-  department: string;
+  department_id: string;
 }
 
 export interface UnitUpdatePayload {
   name?: string;
+  supervisor_id?: string | null;
 }
 
 // ─── Payload types ──────────────────────────────────────────────────────────
@@ -90,6 +91,8 @@ export interface UserUpdatePayload {
   date_of_birth?: string | null;
   phone?: string;
   department?: string | null;
+  /** Assign/unassign user to a unit by id */
+  unit?: string | null;
   is_active?: boolean;
 }
 
@@ -112,7 +115,7 @@ export interface LineManagerPayload {
 }
 
 export interface DepartmentChangePayload {
-  department: string;
+  department: string | null;
 }
 
 /** User-editable profile fields only (PATCH /auth/profile/) */
