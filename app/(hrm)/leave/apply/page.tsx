@@ -280,11 +280,9 @@ export default function ApplyLeavePage() {
   const noCoverOptions = deptId && coverOptions.length === 0;
   const canSubmit =
     !noDepartment &&
-    !noCoverOptions &&
     leaveTypeId !== "" &&
     startDate !== "" &&
-    endDate !== "" &&
-    coverPersonId !== "";
+    endDate !== "";
   const canSaveDraft = canSubmit;
 
   const createDraftMutation = useMutation({
@@ -347,7 +345,7 @@ export default function ApplyLeavePage() {
     end_date: endDate,
     reason,
     is_emergency: false,
-    cover_person: coverPersonId,
+    ...(coverPersonId ? { cover_person: coverPersonId } : {}),
   };
 
   function doSaveDraft() {
@@ -407,11 +405,9 @@ export default function ApplyLeavePage() {
               Executive Director.
             </p>
 
-            {(noDepartment || noCoverOptions) && (
+            {noDepartment && (
               <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                {noDepartment
-                  ? "You must be assigned to a department to apply for leave."
-                  : "No other members in your department to act as cover."}
+                You must be assigned to a department to apply for leave.
               </div>
             )}
 
@@ -466,31 +462,25 @@ export default function ApplyLeavePage() {
 
               {deptId && (
                 <div>
-                  <FieldLabel htmlFor={`${formId}-cover`}>
-                    Cover person
+                  <FieldLabel htmlFor={`${formId}-cover`} optional>
+                    Reliever
                   </FieldLabel>
-                  {coverOptions.length === 0 ? (
-                    <div className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-                      No other members in your department.
-                    </div>
-                  ) : (
-                    <select
-                      id={`${formId}-cover`}
-                      value={coverPersonId}
-                      onChange={(e) => setCoverPersonId(e.target.value)}
-                      className={cn(fieldClass, "cursor-pointer")}
-                      required
-                    >
-                      <option value="" disabled>
-                        Select cover person
+                  <select
+                    id={`${formId}-cover`}
+                    value={coverPersonId}
+                    onChange={(e) => setCoverPersonId(e.target.value)}
+                    className={cn(fieldClass, "cursor-pointer")}
+                    disabled={coverOptions.length === 0}
+                  >
+                    <option value="">
+                      {coverOptions.length === 0 ? "No relievers available" : "None"}
+                    </option>
+                    {coverOptions.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.full_name}
                       </option>
-                      {coverOptions.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.full_name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                    ))}
+                  </select>
                 </div>
               )}
 

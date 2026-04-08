@@ -88,25 +88,11 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
           onClick={() => setMobileOpen(false)}
           className="flex shrink-0 items-center gap-2.5 mr-2"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <svg
-              viewBox="0 0 24 24"
-              className="h-4 w-4"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M12 3L4 19h16L12 3Z"
-                fill="currentColor"
-                className="text-primary-foreground"
-              />
-              <path
-                d="M12 3L4 19h8V3Z"
-                fill="currentColor"
-                className="text-primary-foreground opacity-60"
-              />
-            </svg>
-          </div>
+          <img
+            src="/incel-icon.png"
+            alt="Incel Group logo"
+            className="h-10 w-10"
+          />
           <div className="hidden sm:block leading-none">
             <span className="block font-serif font-semibold text-base text-foreground">
               Incel Group

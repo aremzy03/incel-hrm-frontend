@@ -20,5 +20,15 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon\\.ico|api/).*)"],
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization)
+     * - favicon.ico (favicon)
+     * - api routes
+     * - files with extensions (.png, .svg, .jpg, .ico, etc.)
+     */
+    "/((?!_next/static|_next/image|favicon\\.ico|api/|.*\\..*).*)",
+  ],
 };

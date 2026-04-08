@@ -566,7 +566,7 @@ export default function LeaveRequestDetailPage({
                 {deptId && (
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-foreground">
-                      Cover person
+                      Reliever
                     </label>
                     <select
                       value={editForm.cover_person}
@@ -577,7 +577,7 @@ export default function LeaveRequestDetailPage({
                       }
                       className={cn(fieldClass, "cursor-pointer")}
                     >
-                      <option value="">Select cover person</option>
+                      <option value="">Select reliever</option>
                       {coverOptions.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.full_name}

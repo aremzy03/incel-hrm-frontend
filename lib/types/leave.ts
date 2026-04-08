@@ -81,7 +81,11 @@ export interface LeaveRequestCreatePayload {
   end_date: string;
   reason: string;
   is_emergency: boolean;
-  cover_person: string;
+  /**
+   * Optional on backend; omit or send null/empty when not provided.
+   * Keep as string for selected employee id.
+   */
+  cover_person?: string | null;
 }
 
 export interface LeaveTypeCreatePayload {

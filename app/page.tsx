@@ -21,12 +21,11 @@ function BrandPanel() {
       <div className="absolute right-20 top-1/3 h-24 w-24 rounded-full bg-white/[0.07]" />
 
       <div className="relative z-10 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-            <path d="M12 3L4 19h16L12 3Z" fill="white" />
-            <path d="M12 3L4 19h8V3Z" fill="white" opacity="0.5" />
-          </svg>
-        </div>
+        <img
+          src="/incel-icon.png"
+          alt="Incel Group logo"
+          className="h-12 w-12"
+        />
         <div className="leading-none">
           <p className="font-serif font-semibold text-lg text-white">Incel Group</p>
           <p className="text-[10px] uppercase tracking-widest text-white/60">HR Portal</p>
@@ -118,12 +117,11 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center bg-background px-6 py-12">
         <div className="w-full max-w-[360px]">
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
-                <path d="M12 3L4 19h16L12 3Z" fill="white" />
-                <path d="M12 3L4 19h8V3Z" fill="white" opacity="0.5" />
-              </svg>
-            </div>
+            <img
+              src="/incel-icon.png"
+              alt="Incel Group logo"
+              className="h-12 w-12"
+            />
             <span className="font-serif font-semibold text-base text-foreground">
               Incel Group
             </span>

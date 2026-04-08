@@ -24,6 +24,14 @@ const fontMono = Roboto_Mono({
 export const metadata: Metadata = {
   title: "Incel HRM",
   description: "Human Resource Management Application",
+  icons: {
+    icon: [
+      { url: "/incel-icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/incel-icon.png", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({
