@@ -5,6 +5,7 @@ type RoleName =
   | "EMPLOYEE"
   | "LINE_MANAGER"
   | "SUPERVISOR"
+  | "TEAM_LEAD"
   | "HR"
   | "EXECUTIVE_DIRECTOR"
   | "MANAGING_DIRECTOR";
@@ -13,6 +14,7 @@ const APPROVER_STEP: Record<RoleName, LeaveStatus | null> = {
   EMPLOYEE: null,
   SUPERVISOR: "PENDING_SUPERVISOR",
   LINE_MANAGER: "PENDING_MANAGER",
+  TEAM_LEAD: "PENDING_TEAM_LEAD",
   HR: "PENDING_HR",
   EXECUTIVE_DIRECTOR: "PENDING_ED",
   // Kept for backward compatibility with existing UI role list

@@ -7,6 +7,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   useDepartmentDetail,
   useDepartments,
+  useUpdateDepartment,
+  useAssignLineManager,
+  useRemoveLineManager,
 } from "@/lib/api/departments";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
 import { ArrowLeft, Users, Building2, Loader2, Plus, Trash2, Pencil, UserPlus, Shield } from "lucide-react";
@@ -52,7 +55,7 @@ export default function DepartmentDetailPage() {
   const id = params.id as string;
   const { data, isLoading, error } = useDepartmentDetail(id);
   const { data: deptsData } = useDepartments();
-  const [tab, setTab] = useState<"members" | "units">("members");
+  const [tab, setTab] = useState<"manage" | "members" | "units">("manage");
 
   const { data: usersData, isLoading: usersLoading } = useUsers();
   const allUsers = usersData?.results ?? [];
@@ -60,7 +63,19 @@ export default function DepartmentDetailPage() {
   const changeDept = useChangeUserDepartment();
   const createUnit = useCreateUnit();
   const deleteUnit = useDeleteUnit();
+  const updateDept = useUpdateDepartment(id);
+  const assignLineManager = useAssignLineManager(id);
+  const removeLineManager = useRemoveLineManager(id);
   const qc = useQueryClient();
+
+  const membersSorted = useMemo(() => {
+    const members = data?.members ?? [];
+    return members.slice().sort((a, b) => {
+      const an = `${a.first_name} ${a.last_name}`.trim();
+      const bn = `${b.first_name} ${b.last_name}`.trim();
+      return an.localeCompare(bn);
+    });
+  }, [data?.members]);
 
   const updateUnit = useMutation({
     mutationFn: ({
@@ -112,6 +127,13 @@ export default function DepartmentDetailPage() {
   const [supervisorUserId, setSupervisorUserId] = useState("");
   const [supervisorError, setSupervisorError] = useState<string | null>(null);
 
+  const [deptEditName, setDeptEditName] = useState("");
+  const [deptEditDescription, setDeptEditDescription] = useState("");
+  const [deptEditError, setDeptEditError] = useState<string | null>(null);
+
+  const [lineManagerUserId, setLineManagerUserId] = useState("");
+  const [lineManagerError, setLineManagerError] = useState<string | null>(null);
+
   const departments = deptsData?.results ?? [];
   void departments;
 
@@ -131,7 +153,10 @@ export default function DepartmentDetailPage() {
     createUnit.isPending ||
     deleteUnit.isPending ||
     updateUnit.isPending ||
-    updateUserFields.isPending;
+    updateUserFields.isPending ||
+    updateDept.isPending ||
+    assignLineManager.isPending ||
+    removeLineManager.isPending;
 
   async function handleAddMember() {
     setAddMemberError(null);
@@ -258,6 +283,8 @@ export default function DepartmentDetailPage() {
 
   const { department, members, units } = data;
   const lineManager = department.line_manager;
+  const currentLineManagerId =
+    typeof lineManager === "string" ? lineManager : lineManager?.id ?? "";
 
   return (
     <div className="p-6">
@@ -316,6 +343,18 @@ export default function DepartmentDetailPage() {
           <div className="flex border-b border-border">
             <button
               type="button"
+              onClick={() => setTab("manage")}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition ${
+                tab === "manage"
+                  ? "border-b-2 border-primary bg-primary/5 text-primary"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              }`}
+            >
+              <Shield className="h-4 w-4" />
+              Manage
+            </button>
+            <button
+              type="button"
               onClick={() => setTab("members")}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition ${
                 tab === "members"
@@ -372,6 +411,164 @@ export default function DepartmentDetailPage() {
           </div>
 
           <div className="p-4">
+            {tab === "manage" && (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">
+                        Department settings
+                      </h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Update department details and line manager.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeptEditError(null);
+                        setLineManagerError(null);
+                        setDeptEditName(department.name ?? "");
+                        setDeptEditDescription(department.description ?? "");
+                        setLineManagerUserId(currentLineManagerId);
+                      }}
+                      disabled={pendingAny}
+                      className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold transition hover:bg-muted disabled:opacity-60"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Load current
+                    </button>
+                  </div>
+
+                  {deptEditError && (
+                    <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      {deptEditError}
+                    </p>
+                  )}
+                  {lineManagerError && (
+                    <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      {lineManagerError}
+                    </p>
+                  )}
+
+                  <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                        Name
+                      </label>
+                      <input
+                        value={deptEditName}
+                        onChange={(e) => setDeptEditName(e.target.value)}
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                        placeholder={department.name}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                        Line manager
+                      </label>
+                      <select
+                        value={lineManagerUserId}
+                        onChange={(e) => setLineManagerUserId(e.target.value)}
+                        className={cn(
+                          "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
+                        )}
+                      >
+                        <option value="">None</option>
+                        {membersSorted.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {getMemberName(m)} — {m.email}
+                          </option>
+                        ))}
+                      </select>
+                      {membersSorted.length === 0 && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Add members first to assign a line manager.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                      Description
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={deptEditDescription}
+                      onChange={(e) => setDeptEditDescription(e.target.value)}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                      placeholder="Optional description…"
+                    />
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      disabled={pendingAny}
+                      onClick={async () => {
+                        setDeptEditError(null);
+                        try {
+                          await updateDept.mutateAsync({
+                            name: (deptEditName || department.name || "").trim(),
+                            description: deptEditDescription?.trim() || "",
+                          });
+                          qc.invalidateQueries({ queryKey: ["department-detail", id] });
+                        } catch (e: unknown) {
+                          setDeptEditError(
+                            e instanceof Error ? e.message : "Failed to update department."
+                          );
+                        }
+                      }}
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+                    >
+                      Save details
+                    </button>
+
+                    {lineManagerUserId ? (
+                      <button
+                        type="button"
+                        disabled={pendingAny}
+                        onClick={async () => {
+                          setLineManagerError(null);
+                          try {
+                            await assignLineManager.mutateAsync({ user_id: lineManagerUserId });
+                            qc.invalidateQueries({ queryKey: ["department-detail", id] });
+                          } catch (e: unknown) {
+                            setLineManagerError(
+                              e instanceof Error ? e.message : "Failed to assign line manager."
+                            );
+                          }
+                        }}
+                        className="rounded-lg border border-border px-4 py-2 text-sm font-semibold transition hover:bg-muted disabled:opacity-60"
+                      >
+                        Save line manager
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={pendingAny || !currentLineManagerId}
+                        onClick={async () => {
+                          setLineManagerError(null);
+                          try {
+                            await removeLineManager.mutateAsync();
+                            qc.invalidateQueries({ queryKey: ["department-detail", id] });
+                          } catch (e: unknown) {
+                            setLineManagerError(
+                              e instanceof Error ? e.message : "Failed to remove line manager."
+                            );
+                          }
+                        }}
+                        className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive transition hover:bg-destructive/15 disabled:opacity-60"
+                      >
+                        Remove line manager
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             {tab === "members" && (
               <div className="overflow-x-auto">
                 {members.length === 0 ? (

@@ -26,6 +26,7 @@ interface ModalState {
 }
 
 const PENDING_STATUSES: LeaveStatus[] = [
+  "PENDING_TEAM_LEAD",
   "PENDING_SUPERVISOR",
   "PENDING_MANAGER",
   "PENDING_HR",
@@ -33,6 +34,7 @@ const PENDING_STATUSES: LeaveStatus[] = [
 ];
 
 const FILTER_STATUSES: LeaveStatus[] = [
+  "PENDING_TEAM_LEAD",
   "PENDING_SUPERVISOR",
   "PENDING_MANAGER",
   "PENDING_HR",

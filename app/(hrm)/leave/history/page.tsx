@@ -21,6 +21,7 @@ const PAGE_SIZE = 5;
 
 const ALL_STATUSES: LeaveStatus[] = [
   "DRAFT",
+  "PENDING_TEAM_LEAD",
   "PENDING_SUPERVISOR",
   "PENDING_MANAGER",
   "PENDING_HR",
@@ -33,6 +34,7 @@ const ALL_STATUSES: LeaveStatus[] = [
 /** Statuses from which the owner can cancel their leave request */
 const CANCELLABLE_BY_OWNER: LeaveStatus[] = [
   "DRAFT",
+  "PENDING_TEAM_LEAD",
   "PENDING_SUPERVISOR",
   "PENDING_MANAGER",
 ];

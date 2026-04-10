@@ -24,6 +24,7 @@ import type {
 } from "@/lib/types/leave";
 
 const APPROVAL_STEPS = [
+  "Team Lead (if applicable)",
   "Unit Supervisor (if applicable)",
   "Line Manager",
   "HR Department",
@@ -85,6 +86,7 @@ function countWorkingDays(startStr: string, endStr: string): number {
 
 const OVERLAP_STATUSES: LeaveStatus[] = [
   "DRAFT",
+  "PENDING_TEAM_LEAD",
   "PENDING_SUPERVISOR",
   "PENDING_MANAGER",
   "PENDING_HR",

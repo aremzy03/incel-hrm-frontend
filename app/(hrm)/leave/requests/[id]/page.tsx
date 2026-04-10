@@ -238,7 +238,12 @@ export default function LeaveRequestDetailPage({
   const canOwnerCancel =
     !!request &&
     isOwner &&
-    (["DRAFT", "PENDING_SUPERVISOR", "PENDING_MANAGER"] as LeaveStatus[]).includes(
+    ([
+      "DRAFT",
+      "PENDING_TEAM_LEAD",
+      "PENDING_SUPERVISOR",
+      "PENDING_MANAGER",
+    ] as LeaveStatus[]).includes(
       request.status as LeaveStatus
     );
 

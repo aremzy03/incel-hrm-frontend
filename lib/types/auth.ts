@@ -4,7 +4,8 @@ export type RoleName =
   | "SUPERVISOR"
   | "HR"
   | "EXECUTIVE_DIRECTOR"
-  | "MANAGING_DIRECTOR";
+  | "MANAGING_DIRECTOR"
+  | "TEAM_LEAD";
 
 export interface Role {
   id: string;
@@ -29,6 +30,8 @@ export interface User {
   department: string | { id: string; name: string } | null;
   /** Unit the user belongs to (when exposed by API) */
   unit?: { id: string; name: string } | null;
+  /** Team the user belongs to (when exposed by API) */
+  team?: { id: string; name: string } | null;
   /** Unit the user supervises (when user has SUPERVISOR role and API exposes it) */
   supervised_unit?: { id: string; name?: string } | null;
   date_joined: string;
@@ -69,6 +72,41 @@ export interface UnitCreatePayload {
 export interface UnitUpdatePayload {
   name?: string;
   supervisor_id?: string | null;
+}
+
+// ─── Teams ────────────────────────────────────────────────────────────────────
+
+export interface TeamMinimal {
+  id: string;
+  name: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  /** Backend may return nested unit or just unit id */
+  unit: { id: string; name?: string } | string;
+  /** Present when backend includes it */
+  team_lead?: (UserMinimal & { name?: string }) | null;
+  /** Present when backend includes it */
+  members?: UserMinimal[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TeamCreatePayload {
+  name: string;
+  unit_id: string;
+  team_lead_id?: string | null;
+}
+
+export interface TeamUpdatePayload {
+  name?: string;
+  team_lead_id?: string | null;
+}
+
+export interface TeamUserActionPayload {
+  user_id: string;
 }
 
 // ─── Payload types ──────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 export type LeaveStatus =
   | "DRAFT"
+  | "PENDING_TEAM_LEAD"
   | "PENDING_SUPERVISOR"
   | "PENDING_MANAGER"
   | "PENDING_HR"
@@ -10,6 +11,7 @@ export type LeaveStatus =
 
 export const LEAVE_STATUS_DISPLAY: Record<LeaveStatus, string> = {
   DRAFT: "Draft",
+  PENDING_TEAM_LEAD: "Pending Team Lead",
   PENDING_SUPERVISOR: "Pending Unit Supervisor",
   PENDING_MANAGER: "Pending Manager",
   PENDING_HR: "Pending HR",
