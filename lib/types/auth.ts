@@ -109,6 +109,45 @@ export interface TeamUserActionPayload {
   user_id: string;
 }
 
+// ─── Bulk membership ─────────────────────────────────────────────────────────
+
+export type BulkMembershipFailureCode =
+  | "not_found"
+  | "department_conflict"
+  | "team_conflict"
+  | "unit_mismatch"
+  | "not_in_department"
+  | "not_in_unit"
+  | "not_in_team";
+
+export interface BulkMembershipRequest {
+  user_ids: string[];
+  dry_run: boolean;
+  clear_conflicts: boolean;
+}
+
+export interface BulkMembershipRemoveRequest {
+  user_ids: string[];
+  dry_run: boolean;
+}
+
+export interface BulkMembershipFailure {
+  user_id: string;
+  code: BulkMembershipFailureCode;
+  error: string;
+}
+
+export type BulkMembershipTarget =
+  | { department_id: string }
+  | { unit_id: string }
+  | { team_id: string };
+
+export interface BulkMembershipResponse {
+  target: BulkMembershipTarget;
+  succeeded_user_ids: string[];
+  failed: BulkMembershipFailure[];
+}
+
 // ─── Payload types ──────────────────────────────────────────────────────────
 
 export interface UserCreatePayload {

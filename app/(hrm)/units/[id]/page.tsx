@@ -3,10 +3,17 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useUnitDetail, useDeleteUnit, useUpdateUnit } from "@/lib/api/units";
+import {
+  useBulkAddMembersToUnit,
+  useBulkRemoveUnitMembers,
+  useUnitDetail,
+  useUnits,
+  useDeleteUnit,
+  useUpdateUnit,
+} from "@/lib/api/units";
 import { useDepartmentMembers } from "@/lib/api/departments";
 import {
-  useAddTeamMember,
+  useBulkAddTeamMembers,
   useClearTeamLead,
   useCreateTeam,
   useDeleteTeam,
@@ -16,11 +23,19 @@ import {
   useUpdateTeam,
 } from "@/lib/api/teams";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
-import { ArrowLeft, Users, Loader2, Pencil, Trash2, Shield } from "lucide-react";
+import { ArrowLeft, Users, Loader2, Pencil, Trash2, Shield, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { hasRole } from "@/lib/rbac";
-import type { Team } from "@/lib/types/auth";
+import type {
+  BulkMembershipFailureCode,
+  BulkMembershipResponse,
+  Team,
+  UserMinimal,
+} from "@/lib/types/auth";
+import { BulkUserPicker } from "@/components/hrm/users/BulkUserPicker";
+import { Pagination } from "@/components/hrm/ui/Pagination";
+import { BulkResultPanel } from "@/components/hrm/users/BulkResultPanel";
 
 function getMemberName(m: { first_name: string; last_name: string }) {
   return [m.first_name, m.last_name].filter(Boolean).join(" ") || "—";
@@ -29,11 +44,10 @@ function getMemberName(m: { first_name: string; last_name: string }) {
 function getTeamLeadLabel(team: Team): string {
   const lead = team.team_lead;
   if (!lead) return "None";
+  const l = lead as UserMinimal & { full_name?: string; name?: string };
   const name =
-    (lead as any).full_name ??
-    (lead as any).name ??
-    [lead.first_name, lead.last_name].filter(Boolean).join(" ");
-  return `${name || "—"}${lead.email ? ` — ${lead.email}` : ""}`;
+    l.full_name ?? l.name ?? [l.first_name, l.last_name].filter(Boolean).join(" ");
+  return `${name || "—"}${l.email ? ` — ${l.email}` : ""}`;
 }
 
 function Overlay({
@@ -66,6 +80,11 @@ export default function UnitDetailPage() {
 
   const deptId = data?.department?.id ?? "";
   const { data: deptMembers = [] } = useDepartmentMembers(deptId);
+  const { data: departmentUnits = [] } = useUnits(deptId);
+
+  const bulkAddMembersToUnit = useBulkAddMembersToUnit();
+  const bulkRemoveUnitMembers = useBulkRemoveUnitMembers(id);
+  const bulkAddTeamMembers = useBulkAddTeamMembers(id);
 
   const [editOpen, setEditOpen] = useState(false);
   const [unitName, setUnitName] = useState("");
@@ -84,7 +103,6 @@ export default function UnitDetailPage() {
   const createTeam = useCreateTeam();
   const updateTeam = useUpdateTeam(id);
   const deleteTeam = useDeleteTeam(id);
-  const addMember = useAddTeamMember(id);
   const removeMember = useRemoveTeamMember(id);
   const setLead = useSetTeamLead(id);
   const clearLead = useClearTeamLead(id);
@@ -103,12 +121,57 @@ export default function UnitDetailPage() {
   const [teamMembersOpen, setTeamMembersOpen] = useState(false);
   const [teamMembersId, setTeamMembersId] = useState<string>("");
   const [teamMembersError, setTeamMembersError] = useState<string | null>(null);
-  const [teamMemberToAdd, setTeamMemberToAdd] = useState<string>("");
+  const [teamMembersSearch, setTeamMembersSearch] = useState("");
+  const [teamMembersSelectedUserIds, setTeamMembersSelectedUserIds] = useState<string[]>([]);
+  const [teamMembersResult, setTeamMembersResult] = useState<BulkMembershipResponse | null>(null);
+
+  const pageSize = 20;
+  const [unitMembersPage, setUnitMembersPage] = useState(1);
+  const [unitSelectedUserIds, setUnitSelectedUserIds] = useState<string[]>([]);
+  const [applyUnitMoveModalOpen, setApplyUnitMoveModalOpen] = useState(false);
+  const [applyUnitMoveTargetId, setApplyUnitMoveTargetId] = useState("");
+  const [applyUnitMoveClearConflicts, setApplyUnitMoveClearConflicts] = useState(false);
+  const [applyUnitMoveModalError, setApplyUnitMoveModalError] = useState<string | null>(null);
+  const [applyTeamAddModalOpen, setApplyTeamAddModalOpen] = useState(false);
+  const [applyTeamAddTargetId, setApplyTeamAddTargetId] = useState("");
+  const [applyTeamAddClearConflicts, setApplyTeamAddClearConflicts] = useState(false);
+  const [applyTeamAddModalError, setApplyTeamAddModalError] = useState<string | null>(null);
+  const [membersBulkResult, setMembersBulkResult] = useState<BulkMembershipResponse | null>(null);
+
+  const siblingDepartmentUnits = useMemo(
+    () => departmentUnits.filter((u) => u.id !== id),
+    [departmentUnits, id]
+  );
+  const [membersSearch, setMembersSearch] = useState("");
+  const [membersTeamFilter, setMembersTeamFilter] = useState<"" | "none" | string>("");
 
   const selectedTeam = useMemo(
     () => teams.find((t) => t.id === teamMembersId || t.id === teamEditId) ?? null,
     [teams, teamMembersId, teamEditId]
   );
+
+  const userTeamById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of teams) {
+      for (const m of t.members ?? []) {
+        map.set(m.id, t.id);
+      }
+    }
+    return map;
+  }, [teams]);
+
+  const filteredUnitMembers = useMemo(() => {
+    const q = membersSearch.trim().toLowerCase();
+    return (data?.members ?? []).filter((m) => {
+      const matchesSearch =
+        !q || `${getMemberName(m)} ${m.email}`.toLowerCase().includes(q);
+      const teamId = userTeamById.get(m.id) ?? "";
+      const matchesTeam =
+        !membersTeamFilter ||
+        (membersTeamFilter === "none" ? !teamId : teamId === membersTeamFilter);
+      return matchesSearch && matchesTeam;
+    });
+  }, [data?.members, membersSearch, membersTeamFilter, userTeamById]);
 
   const supervisorOptions = useMemo(() => {
     return deptMembers.slice().sort((a, b) => {
@@ -144,10 +207,144 @@ export default function UnitDetailPage() {
     createTeam.isPending ||
     updateTeam.isPending ||
     deleteTeam.isPending ||
-    addMember.isPending ||
+    bulkAddTeamMembers.isPending ||
+    bulkAddMembersToUnit.isPending ||
+    bulkRemoveUnitMembers.isPending ||
     removeMember.isPending ||
     setLead.isPending ||
     clearLead.isPending;
+
+  function toggleUnitSelected(userId: string, next: boolean) {
+    setUnitSelectedUserIds((prev) => {
+      const set = new Set(prev);
+      if (next) set.add(userId);
+      else set.delete(userId);
+      return Array.from(set);
+    });
+  }
+
+  function openApplyUnitMoveModal() {
+    setApplyUnitMoveModalError(null);
+    setApplyUnitMoveTargetId("");
+    setApplyUnitMoveClearConflicts(false);
+    setApplyUnitMoveModalOpen(true);
+  }
+
+  async function handleConfirmApplyUnitMoveFromModal() {
+    setMembersBulkResult(null);
+    setApplyUnitMoveModalError(null);
+    if (unitSelectedUserIds.length === 0) {
+      setApplyUnitMoveModalError("No members selected.");
+      return;
+    }
+    if (!applyUnitMoveTargetId) {
+      setApplyUnitMoveModalError("Select a destination unit.");
+      return;
+    }
+    if (applyUnitMoveTargetId === id) {
+      setApplyUnitMoveModalError("Choose a different unit than the current one.");
+      return;
+    }
+    try {
+      const res = await bulkAddMembersToUnit.mutateAsync({
+        unitId: applyUnitMoveTargetId,
+        payload: {
+          user_ids: unitSelectedUserIds,
+          dry_run: false,
+          clear_conflicts: applyUnitMoveClearConflicts,
+        },
+      });
+      setMembersBulkResult(res);
+      setApplyUnitMoveModalOpen(false);
+      if (res.failed.length === 0) {
+        setUnitSelectedUserIds([]);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to move members to unit.";
+      setMembersBulkResult({
+        target: { unit_id: id },
+        succeeded_user_ids: [],
+        failed: unitSelectedUserIds.map((uid) => ({
+          user_id: uid,
+          code: "not_found" as BulkMembershipFailureCode,
+          error: msg,
+        })),
+      });
+      setApplyUnitMoveModalOpen(false);
+    }
+  }
+
+  function openApplyTeamAddModal() {
+    setApplyTeamAddModalError(null);
+    setApplyTeamAddTargetId("");
+    setApplyTeamAddClearConflicts(false);
+    setApplyTeamAddModalOpen(true);
+  }
+
+  async function handleConfirmApplyTeamAddFromModal() {
+    setMembersBulkResult(null);
+    setApplyTeamAddModalError(null);
+    if (unitSelectedUserIds.length === 0) {
+      setApplyTeamAddModalError("No members selected.");
+      return;
+    }
+    if (!applyTeamAddTargetId) {
+      setApplyTeamAddModalError("Select a team.");
+      return;
+    }
+    try {
+      const res = await bulkAddTeamMembers.mutateAsync({
+        teamId: applyTeamAddTargetId,
+        payload: {
+          user_ids: unitSelectedUserIds,
+          dry_run: false,
+          clear_conflicts: applyTeamAddClearConflicts,
+        },
+      });
+      setMembersBulkResult(res);
+      setApplyTeamAddModalOpen(false);
+      if (res.failed.length === 0) {
+        setUnitSelectedUserIds([]);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to add members to team.";
+      setMembersBulkResult({
+        target: { unit_id: id },
+        succeeded_user_ids: [],
+        failed: unitSelectedUserIds.map((uid) => ({
+          user_id: uid,
+          code: "not_found" as BulkMembershipFailureCode,
+          error: msg,
+        })),
+      });
+      setApplyTeamAddModalOpen(false);
+    }
+  }
+
+  async function handleBulkRemoveFromUnit() {
+    setMembersBulkResult(null);
+    if (unitSelectedUserIds.length === 0) return;
+    try {
+      const res = await bulkRemoveUnitMembers.mutateAsync({
+        user_ids: unitSelectedUserIds,
+        dry_run: false,
+      });
+      setMembersBulkResult(res);
+      setUnitSelectedUserIds([]);
+      setUnitMembersPage(1);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to remove members from unit.";
+      setMembersBulkResult({
+        target: { unit_id: id },
+        succeeded_user_ids: [],
+        failed: unitSelectedUserIds.map((uid) => ({
+          user_id: uid,
+          code: "not_in_unit" as BulkMembershipFailureCode,
+          error: msg,
+        })),
+      });
+    }
+  }
 
   async function handleSaveName() {
     setUnitError(null);
@@ -352,39 +549,158 @@ export default function UnitDetailPage() {
             )}
 
             {tab === "members" && (
-              <div className="overflow-x-auto">
+              <div className="space-y-3">
                 {!members?.length ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">
                     No members in this unit.
                   </p>
                 ) : (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="px-4 py-2 text-left font-medium text-muted-foreground">
-                          Name
-                        </th>
-                        <th className="px-4 py-2 text-left font-medium text-muted-foreground">
-                          Email
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {members.map((m) => (
-                        <tr
-                          key={m.id}
-                          className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                  <>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={openApplyUnitMoveModal}
+                          disabled={
+                            pendingAny ||
+                            unitSelectedUserIds.length === 0 ||
+                            siblingDepartmentUnits.length === 0
+                          }
+                          title={
+                            siblingDepartmentUnits.length === 0
+                              ? "No other units in this department to move members to"
+                              : undefined
+                          }
+                          className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
                         >
-                          <td className="px-4 py-3 font-medium text-foreground">
-                            {getMemberName(m)}
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground">
-                            {m.email}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          Change Unit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={openApplyTeamAddModal}
+                          disabled={
+                            pendingAny ||
+                            unitSelectedUserIds.length === 0 ||
+                            teams.length === 0
+                          }
+                          title={
+                            teams.length === 0
+                              ? "Create a team on this unit first"
+                              : undefined
+                          }
+                          className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+                        >
+                          Add To Team
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleBulkRemoveFromUnit}
+                          disabled={pendingAny || unitSelectedUserIds.length === 0}
+                          title="Remove selected members from this unit"
+                          aria-label="Remove selected members from this unit"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive transition hover:bg-destructive/15 disabled:opacity-60"
+                        >
+                          <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
+                          Remove
+                        </button>
+
+                        <div className="relative w-full sm:w-64">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <input
+                            value={membersSearch}
+                            onChange={(e) => {
+                              setMembersSearch(e.target.value);
+                              setUnitMembersPage(1);
+                            }}
+                            placeholder="Search members…"
+                            className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring transition"
+                          />
+                        </div>
+
+                        <select
+                          value={membersTeamFilter}
+                          onChange={(e) => {
+                            setMembersTeamFilter(
+                              e.target.value as "" | "none" | string
+                            );
+                            setUnitMembersPage(1);
+                          }}
+                          className="w-full sm:w-56 rounded-lg border border-border bg-background px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring transition"
+                          aria-label="Filter by team"
+                        >
+                          <option value="">All teams</option>
+                          <option value="none">No team</option>
+                          {teams.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <Pagination
+                        page={unitMembersPage}
+                        pageSize={pageSize}
+                        total={filteredUnitMembers.length}
+                        onPageChange={setUnitMembersPage}
+                      />
+                    </div>
+
+                    <BulkResultPanel title="Bulk action result" result={membersBulkResult} />
+
+                    <div className="overflow-x-auto rounded-xl border border-border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border bg-muted/30">
+                            <th className="px-4 py-2 text-left font-medium text-muted-foreground">
+                              Select
+                            </th>
+                            <th className="px-4 py-2 text-left font-medium text-muted-foreground">
+                              Name
+                            </th>
+                            <th className="px-4 py-2 text-left font-medium text-muted-foreground">
+                              Email
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredUnitMembers
+                            .slice((unitMembersPage - 1) * pageSize, unitMembersPage * pageSize)
+                            .map((m) => {
+                              const checked = unitSelectedUserIds.includes(m.id);
+                              return (
+                                <tr
+                                  key={m.id}
+                                  className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                                >
+                                  <td className="px-4 py-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={(e) => toggleUnitSelected(m.id, e.target.checked)}
+                                      disabled={pendingAny}
+                                      className="h-4 w-4 rounded border-border accent-primary"
+                                      aria-label={`Select ${getMemberName(m)}`}
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3 font-medium text-foreground">
+                                    {getMemberName(m)}
+                                  </td>
+                                  <td className="px-4 py-3 text-muted-foreground">{m.email}</td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <Pagination
+                      page={unitMembersPage}
+                      pageSize={pageSize}
+                      total={filteredUnitMembers.length}
+                      onPageChange={setUnitMembersPage}
+                      className="pt-2"
+                    />
+                  </>
                 )}
               </div>
             )}
@@ -453,8 +769,10 @@ export default function UnitDetailPage() {
                                   type="button"
                                   onClick={() => {
                                     setTeamMembersError(null);
+                                    setTeamMembersResult(null);
                                     setTeamMembersId(t.id);
-                                    setTeamMemberToAdd("");
+                                    setTeamMembersSelectedUserIds([]);
+                                    setTeamMembersSearch("");
                                     setTeamMembersOpen(true);
                                   }}
                                   disabled={!canManageTeams || pendingAny}
@@ -596,6 +914,205 @@ export default function UnitDetailPage() {
                   Remove supervisor
                 </button>
               )}
+            </div>
+          </div>
+        </Overlay>
+      )}
+
+      {applyUnitMoveModalOpen && (
+        <Overlay
+          onClose={() => {
+            setApplyUnitMoveModalOpen(false);
+            setApplyUnitMoveModalError(null);
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="mb-1 text-lg font-semibold text-foreground">
+              Change Unit
+            </h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Move{" "}
+              <span className="font-medium text-foreground">
+                {unitSelectedUserIds.length}
+              </span>{" "}
+              selected member{unitSelectedUserIds.length !== 1 ? "s" : ""} from{" "}
+              <span className="font-medium text-foreground">{name}</span> into
+              the unit you choose below.
+            </p>
+            {siblingDepartmentUnits.length === 0 ? (
+              <p className="mb-4 rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                There are no other units in this department. Create another unit
+                under the department, then try again.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="unit-move-target-select"
+                    className="mb-1.5 block text-xs font-medium text-muted-foreground"
+                  >
+                    Destination unit
+                  </label>
+                  <select
+                    id="unit-move-target-select"
+                    value={applyUnitMoveTargetId}
+                    onChange={(e) => {
+                      setApplyUnitMoveTargetId(e.target.value);
+                      setApplyUnitMoveModalError(null);
+                    }}
+                    disabled={pendingAny}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
+                  >
+                    <option value="">Select a unit…</option>
+                    {siblingDepartmentUnits.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <label className="flex cursor-pointer items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={applyUnitMoveClearConflicts}
+                    onChange={(e) => setApplyUnitMoveClearConflicts(e.target.checked)}
+                    disabled={pendingAny}
+                    className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+                  />
+                  <span className="text-muted-foreground">
+                    Clear conflicting memberships when the API allows it.
+                  </span>
+                </label>
+              </div>
+            )}
+            {applyUnitMoveModalError && (
+              <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {applyUnitMoveModalError}
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setApplyUnitMoveModalOpen(false);
+                  setApplyUnitMoveModalError(null);
+                }}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmApplyUnitMoveFromModal}
+                disabled={
+                  pendingAny ||
+                  siblingDepartmentUnits.length === 0 ||
+                  !applyUnitMoveTargetId ||
+                  unitSelectedUserIds.length === 0
+                }
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+              >
+                Change Unit
+              </button>
+            </div>
+          </div>
+        </Overlay>
+      )}
+
+      {applyTeamAddModalOpen && (
+        <Overlay
+          onClose={() => {
+            setApplyTeamAddModalOpen(false);
+            setApplyTeamAddModalError(null);
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="mb-1 text-lg font-semibold text-foreground">
+              Add To Team
+            </h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Add{" "}
+              <span className="font-medium text-foreground">
+                {unitSelectedUserIds.length}
+              </span>{" "}
+              selected member{unitSelectedUserIds.length !== 1 ? "s" : ""} to the
+              team you choose below.
+            </p>
+            {teams.length === 0 ? (
+              <p className="mb-4 rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                This unit has no teams yet. Create one under the Teams tab, then try
+                again.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="team-add-target-select"
+                    className="mb-1.5 block text-xs font-medium text-muted-foreground"
+                  >
+                    Team
+                  </label>
+                  <select
+                    id="team-add-target-select"
+                    value={applyTeamAddTargetId}
+                    onChange={(e) => {
+                      setApplyTeamAddTargetId(e.target.value);
+                      setApplyTeamAddModalError(null);
+                    }}
+                    disabled={pendingAny}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
+                  >
+                    <option value="">Select a team…</option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <label className="flex cursor-pointer items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={applyTeamAddClearConflicts}
+                    onChange={(e) => setApplyTeamAddClearConflicts(e.target.checked)}
+                    disabled={pendingAny}
+                    className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+                  />
+                  <span className="text-muted-foreground">
+                    Clear conflicting memberships when the API allows it.
+                  </span>
+                </label>
+              </div>
+            )}
+            {applyTeamAddModalError && (
+              <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {applyTeamAddModalError}
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setApplyTeamAddModalOpen(false);
+                  setApplyTeamAddModalError(null);
+                }}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmApplyTeamAddFromModal}
+                disabled={
+                  pendingAny ||
+                  teams.length === 0 ||
+                  !applyTeamAddTargetId ||
+                  unitSelectedUserIds.length === 0
+                }
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+              >
+                Add To Team
+              </button>
             </div>
           </div>
         </Overlay>
@@ -800,7 +1317,7 @@ export default function UnitDetailPage() {
       {/* Team members modal */}
       {teamMembersOpen && (
         <Overlay onClose={() => setTeamMembersOpen(false)}>
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-xl">
+          <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-xl">
             <h2 className="mb-4 text-lg font-semibold text-foreground">
               Team members
             </h2>
@@ -809,47 +1326,77 @@ export default function UnitDetailPage() {
                 {teamMembersError}
               </p>
             )}
+            {teamMembersResult && (
+              <div className="mb-4 space-y-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+                <p className="text-sm text-foreground">
+                  <span className="font-semibold">Added:</span>{" "}
+                  {teamMembersResult.succeeded_user_ids.length}
+                  {teamMembersResult.failed.length > 0 ? (
+                    <>
+                      {" "}
+                      <span className="text-muted-foreground">•</span>{" "}
+                      <span className="font-semibold">Failed:</span>{" "}
+                      {teamMembersResult.failed.length}
+                    </>
+                  ) : null}
+                </p>
+                {teamMembersResult.failed.length > 0 && (
+                  <ul className="max-h-32 overflow-auto text-xs text-muted-foreground">
+                    {teamMembersResult.failed.map((f) => (
+                      <li key={f.user_id} className="py-1">
+                        <span className="font-semibold text-foreground">{f.code}</span>{" "}
+                        <span className="text-muted-foreground">({f.user_id}):</span>{" "}
+                        {f.error}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-muted-foreground">
-                  Add member
+                  Add members
                 </label>
-                <div className="mt-2 flex gap-2">
-                  <select
-                    value={teamMemberToAdd}
-                    onChange={(e) => setTeamMemberToAdd(e.target.value)}
-                    className={cn(
-                      "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
-                    )}
-                  >
-                    <option value="">Select a unit member</option>
-                    {(members ?? []).map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {getMemberName(m)} — {m.email}
-                      </option>
-                    ))}
-                  </select>
+                <div className="mt-2 space-y-3">
+                  <BulkUserPicker
+                    users={members ?? []}
+                    selectedUserIds={teamMembersSelectedUserIds}
+                    onChangeSelectedUserIds={setTeamMembersSelectedUserIds}
+                    search={teamMembersSearch}
+                    onChangeSearch={setTeamMembersSearch}
+                    disabled={pendingAny || !teamMembersId}
+                    label="Unit members"
+                    emptyText={(members ?? []).length ? "No matches." : "No unit members."}
+                  />
                   <button
                     type="button"
-                    disabled={!teamMemberToAdd || pendingAny || !teamMembersId}
+                    disabled={teamMembersSelectedUserIds.length === 0 || pendingAny || !teamMembersId}
                     onClick={async () => {
                       setTeamMembersError(null);
+                      setTeamMembersResult(null);
                       try {
-                        await addMember.mutateAsync({
+                        const res = await bulkAddTeamMembers.mutateAsync({
                           teamId: teamMembersId,
-                          payload: { user_id: teamMemberToAdd },
+                          payload: {
+                            user_ids: teamMembersSelectedUserIds,
+                            dry_run: false,
+                            clear_conflicts: false,
+                          },
                         });
-                        setTeamMemberToAdd("");
+                        setTeamMembersResult(res);
+                        setTeamMembersSelectedUserIds([]);
+                        setTeamMembersSearch("");
                       } catch (e: unknown) {
                         setTeamMembersError(
                           e instanceof Error ? e.message : "Failed to add member."
                         );
                       }
                     }}
-                    className="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+                    className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
                   >
-                    Add
+                    Add members
                   </button>
                 </div>
               </div>
@@ -889,7 +1436,7 @@ export default function UnitDetailPage() {
                                 className="border-b border-border last:border-0"
                               >
                                 <td className="px-3 py-2 font-medium text-foreground">
-                                  {getMemberName(m as any)}
+                                  {getMemberName(m)}
                                 </td>
                                 <td className="px-3 py-2 text-muted-foreground">
                                   {m.email}

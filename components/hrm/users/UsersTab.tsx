@@ -7,6 +7,8 @@ import {
   Trash2,
   Search,
   ShieldCheck,
+  Eye,
+  EyeOff,
   X,
   ChevronDown,
 } from "lucide-react";
@@ -64,6 +66,7 @@ function UserFormModal({ mode, user, departments, onClose }: UserFormModalProps)
     is_active: user?.is_active ?? true,
   });
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const isPending = createUser.isPending || updateUser.isPending;
 
@@ -106,7 +109,7 @@ function UserFormModal({ mode, user, departments, onClose }: UserFormModalProps)
 
   return (
     <Overlay onClose={onClose}>
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+      <div className="w-full max-w-xl rounded-2xl border border-border bg-card p-6 shadow-xl">
         <h2 className="mb-5 text-lg font-semibold text-foreground">
           {mode === "create" ? "Create User" : "Edit User"}
         </h2>
@@ -124,7 +127,26 @@ function UserFormModal({ mode, user, departments, onClose }: UserFormModalProps)
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted-foreground">Password</label>
-                <input className={fieldCls} type="password" required value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} placeholder="••••••••" />
+                <div className="relative">
+                  <input
+                    className={cn(fieldCls, "pr-10")}
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={form.password}
+                    onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    disabled={isPending}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-60"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
             </div>
           )}

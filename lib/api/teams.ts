@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
-import type { PaginatedResponse, Team, TeamCreatePayload, TeamUpdatePayload, TeamUserActionPayload } from "@/lib/types/auth";
+import type {
+  BulkMembershipRequest,
+  BulkMembershipRemoveRequest,
+  BulkMembershipResponse,
+  PaginatedResponse,
+  Team,
+  TeamCreatePayload,
+  TeamUpdatePayload,
+  TeamUserActionPayload,
+} from "@/lib/types/auth";
 
 function asArray<T>(data: T[] | PaginatedResponse<T> | null | undefined): T[] {
   if (!data) return [];
@@ -109,6 +118,34 @@ export function useClearTeamLead(unitId: string) {
       qc.invalidateQueries({ queryKey: ["teams", unitId] });
       qc.invalidateQueries({ queryKey: ["team"] });
       qc.invalidateQueries({ queryKey: ["unit-detail", unitId] });
+    },
+  });
+}
+
+export function useBulkAddTeamMembers(unitId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamId, payload }: { teamId: string; payload: BulkMembershipRequest }) =>
+      apiPost<BulkMembershipResponse>(`teams/${teamId}/bulk-add-members/`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["teams", unitId] });
+      qc.invalidateQueries({ queryKey: ["team"] });
+      qc.invalidateQueries({ queryKey: ["unit-detail", unitId] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+}
+
+export function useBulkRemoveTeamMembers(unitId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamId, payload }: { teamId: string; payload: BulkMembershipRemoveRequest }) =>
+      apiPost<BulkMembershipResponse>(`teams/${teamId}/bulk-remove-members/`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["teams", unitId] });
+      qc.invalidateQueries({ queryKey: ["team"] });
+      qc.invalidateQueries({ queryKey: ["unit-detail", unitId] });
+      qc.invalidateQueries({ queryKey: ["users"] });
     },
   });
 }

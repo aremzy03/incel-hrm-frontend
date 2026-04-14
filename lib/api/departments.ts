@@ -6,6 +6,9 @@ import {
   apiPost,
 } from "@/lib/api-client";
 import type {
+  BulkMembershipRequest,
+  BulkMembershipRemoveRequest,
+  BulkMembershipResponse,
   Department,
   DepartmentDetailResponse,
   DepartmentPayload,
@@ -89,5 +92,32 @@ export function useRemoveLineManager(deptId: string) {
   return useMutation({
     mutationFn: () => apiDelete<void>(`departments/${deptId}/line-manager/`),
     onSuccess: () => qc.invalidateQueries({ queryKey: DEPTS_KEY }),
+  });
+}
+
+export function useBulkAddDepartmentMembers(deptId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: BulkMembershipRequest) =>
+      apiPost<BulkMembershipResponse>(`departments/${deptId}/bulk-add-members/`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["department-detail", deptId] });
+      qc.invalidateQueries({ queryKey: ["department-members", deptId] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+}
+
+export function useBulkRemoveDepartmentMembers(deptId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: BulkMembershipRemoveRequest) =>
+      apiPost<BulkMembershipResponse>(`departments/${deptId}/bulk-remove-members/`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["department-detail", deptId] });
+      qc.invalidateQueries({ queryKey: ["department-members", deptId] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["unit-detail"] });
+    },
   });
 }

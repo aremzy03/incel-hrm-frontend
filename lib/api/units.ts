@@ -6,6 +6,9 @@ import {
   apiPost,
 } from "@/lib/api-client";
 import type {
+  BulkMembershipRequest,
+  BulkMembershipRemoveRequest,
+  BulkMembershipResponse,
   Unit,
   UnitCreatePayload,
   UnitDetail,
@@ -65,6 +68,49 @@ export function useDeleteUnit() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["units"] });
       qc.invalidateQueries({ queryKey: ["departments"] });
+    },
+  });
+}
+
+export function useBulkAddUnitMembers(unitId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: BulkMembershipRequest) =>
+      apiPost<BulkMembershipResponse>(`units/${unitId}/bulk-add-members/`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["unit-detail", unitId] });
+      qc.invalidateQueries({ queryKey: ["department-detail"] });
+      qc.invalidateQueries({ queryKey: ["department-members"] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+}
+
+export function useBulkAddMembersToUnit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ unitId, payload }: { unitId: string; payload: BulkMembershipRequest }) =>
+      apiPost<BulkMembershipResponse>(`units/${unitId}/bulk-add-members/`, payload),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["unit-detail", variables.unitId] });
+      qc.invalidateQueries({ queryKey: ["department-detail"] });
+      qc.invalidateQueries({ queryKey: ["department-members"] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+}
+
+export function useBulkRemoveUnitMembers(unitId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: BulkMembershipRemoveRequest) =>
+      apiPost<BulkMembershipResponse>(`units/${unitId}/bulk-remove-members/`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["unit-detail", unitId] });
+      qc.invalidateQueries({ queryKey: ["department-detail"] });
+      qc.invalidateQueries({ queryKey: ["department-members"] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["teams", unitId] });
     },
   });
 }

@@ -10,14 +10,26 @@ import {
   useUpdateDepartment,
   useAssignLineManager,
   useRemoveLineManager,
+  useBulkAddDepartmentMembers,
+  useBulkRemoveDepartmentMembers,
 } from "@/lib/api/departments";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
-import { ArrowLeft, Users, Building2, Loader2, Plus, Trash2, Pencil, UserPlus, Shield } from "lucide-react";
+import { ArrowLeft, Users, Building2, Loader2, Plus, Trash2, Pencil, UserPlus, Shield, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUsers, useChangeUserDepartment } from "@/lib/api/users";
 import { apiPatch } from "@/lib/api-client";
-import { useCreateUnit, useDeleteUnit } from "@/lib/api/units";
-import type { Unit, UnitUpdatePayload, User as UserType, UserUpdatePayload } from "@/lib/types/auth";
+import { useBulkAddMembersToUnit, useBulkAddUnitMembers, useCreateUnit, useDeleteUnit } from "@/lib/api/units";
+import type {
+  BulkMembershipFailureCode,
+  BulkMembershipResponse,
+  Unit,
+  UnitUpdatePayload,
+  User as UserType,
+  UserUpdatePayload,
+} from "@/lib/types/auth";
+import { BulkUserPicker } from "@/components/hrm/users/BulkUserPicker";
+import { Pagination } from "@/components/hrm/ui/Pagination";
+import { BulkResultPanel } from "@/components/hrm/users/BulkResultPanel";
 
 function getMemberName(m: { first_name: string; last_name: string }) {
   return [m.first_name, m.last_name].filter(Boolean).join(" ") || "—";
@@ -61,6 +73,9 @@ export default function DepartmentDetailPage() {
   const allUsers = usersData?.results ?? [];
 
   const changeDept = useChangeUserDepartment();
+  const bulkAddDeptMembers = useBulkAddDepartmentMembers(id);
+  const bulkRemoveDeptMembers = useBulkRemoveDepartmentMembers(id);
+  const bulkAddMembersToUnit = useBulkAddMembersToUnit();
   const createUnit = useCreateUnit();
   const deleteUnit = useDeleteUnit();
   const updateDept = useUpdateDepartment(id);
@@ -105,8 +120,11 @@ export default function DepartmentDetailPage() {
   });
 
   const [addMemberOpen, setAddMemberOpen] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState("");
   const [addMemberError, setAddMemberError] = useState<string | null>(null);
+  const [addMemberSearch, setAddMemberSearch] = useState("");
+  const [addMemberSelectedUserIds, setAddMemberSelectedUserIds] = useState<string[]>([]);
+  const [addMemberClearConflicts, setAddMemberClearConflicts] = useState(false);
+  const [addMemberResult, setAddMemberResult] = useState<BulkMembershipResponse | null>(null);
 
   const [createUnitOpen, setCreateUnitOpen] = useState(false);
   const [unitName, setUnitName] = useState("");
@@ -118,8 +136,13 @@ export default function DepartmentDetailPage() {
   const [assignOpen, setAssignOpen] = useState<{
     unit: (Unit & { members?: { id: string; first_name: string; last_name: string; email: string }[] });
   } | null>(null);
-  const [assignUserId, setAssignUserId] = useState("");
+  const bulkAddUnitMembers = useBulkAddUnitMembers(assignOpen?.unit?.id ?? "");
+
   const [assignError, setAssignError] = useState<string | null>(null);
+  const [assignSearch, setAssignSearch] = useState("");
+  const [assignSelectedUserIds, setAssignSelectedUserIds] = useState<string[]>([]);
+  const [assignClearConflicts, setAssignClearConflicts] = useState(false);
+  const [assignResult, setAssignResult] = useState<BulkMembershipResponse | null>(null);
 
   const [supervisorOpen, setSupervisorOpen] = useState<{
     unit: Unit;
@@ -137,10 +160,45 @@ export default function DepartmentDetailPage() {
   const departments = deptsData?.results ?? [];
   void departments;
 
+  const pageSize = 20;
+  const [deptMembersPage, setDeptMembersPage] = useState(1);
+  const [deptSelectedUserIds, setDeptSelectedUserIds] = useState<string[]>([]);
+  const [applyUnitModalOpen, setApplyUnitModalOpen] = useState(false);
+  const [applyUnitSelectedUnitId, setApplyUnitSelectedUnitId] = useState("");
+  const [applyUnitClearConflicts, setApplyUnitClearConflicts] = useState(false);
+  const [applyUnitModalError, setApplyUnitModalError] = useState<string | null>(null);
+  const [membersBulkResult, setMembersBulkResult] = useState<BulkMembershipResponse | null>(null);
+  const [membersSearch, setMembersSearch] = useState("");
+  const [membersUnitFilter, setMembersUnitFilter] = useState<"" | "none" | string>("");
+
   const deptMemberIds = useMemo(() => {
     const members = data?.members ?? [];
     return new Set(members.map((m) => m.id));
   }, [data?.members]);
+
+  const userUnitById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const u of data?.units ?? []) {
+      for (const m of u.members ?? []) {
+        map.set(m.id, u.id);
+      }
+    }
+    return map;
+  }, [data?.units]);
+
+  const filteredDepartmentMembers = useMemo(() => {
+    const q = membersSearch.trim().toLowerCase();
+    return membersSorted.filter((m) => {
+      const matchesSearch =
+        !q ||
+        `${getMemberName(m)} ${m.email}`.toLowerCase().includes(q);
+      const unitId = userUnitById.get(m.id) ?? "";
+      const matchesUnit =
+        !membersUnitFilter ||
+        (membersUnitFilter === "none" ? !unitId : unitId === membersUnitFilter);
+      return matchesSearch && matchesUnit;
+    });
+  }, [membersSearch, membersSorted, membersUnitFilter, userUnitById]);
 
   const eligibleUsersToAdd = useMemo(() => {
     return allUsers
@@ -150,6 +208,10 @@ export default function DepartmentDetailPage() {
 
   const pendingAny =
     changeDept.isPending ||
+    bulkAddDeptMembers.isPending ||
+    bulkRemoveDeptMembers.isPending ||
+    bulkAddMembersToUnit.isPending ||
+    bulkAddUnitMembers.isPending ||
     createUnit.isPending ||
     deleteUnit.isPending ||
     updateUnit.isPending ||
@@ -160,14 +222,17 @@ export default function DepartmentDetailPage() {
 
   async function handleAddMember() {
     setAddMemberError(null);
-    if (!selectedUserId) return;
+    setAddMemberResult(null);
+    if (addMemberSelectedUserIds.length === 0) return;
     try {
-      await changeDept.mutateAsync({
-        userId: selectedUserId,
-        payload: { department: id },
+      const res = await bulkAddDeptMembers.mutateAsync({
+        user_ids: addMemberSelectedUserIds,
+        dry_run: false,
+        clear_conflicts: addMemberClearConflicts,
       });
-      setSelectedUserId("");
-      setAddMemberOpen(false);
+      setAddMemberResult(res);
+      setAddMemberSelectedUserIds([]);
+      setAddMemberSearch("");
     } catch (e: unknown) {
       setAddMemberError(e instanceof Error ? e.message : "Failed to add member.");
     }
@@ -181,6 +246,87 @@ export default function DepartmentDetailPage() {
       });
     } catch {
       // errors are surfaced via toast in api-client (if any); keep UI simple
+    }
+  }
+
+  function toggleDeptSelected(userId: string, next: boolean) {
+    setDeptSelectedUserIds((prev) => {
+      const set = new Set(prev);
+      if (next) set.add(userId);
+      else set.delete(userId);
+      return Array.from(set);
+    });
+  }
+
+  function openApplyUnitModal() {
+    setApplyUnitModalError(null);
+    setApplyUnitSelectedUnitId("");
+    setApplyUnitClearConflicts(false);
+    setApplyUnitModalOpen(true);
+  }
+
+  async function handleConfirmApplyUnitFromModal() {
+    setMembersBulkResult(null);
+    setApplyUnitModalError(null);
+    if (deptSelectedUserIds.length === 0) {
+      setApplyUnitModalError("No members selected.");
+      return;
+    }
+    if (!applyUnitSelectedUnitId) {
+      setApplyUnitModalError("Select a unit to assign.");
+      return;
+    }
+    try {
+      const res = await bulkAddMembersToUnit.mutateAsync({
+        unitId: applyUnitSelectedUnitId,
+        payload: {
+          user_ids: deptSelectedUserIds,
+          dry_run: false,
+          clear_conflicts: applyUnitClearConflicts,
+        },
+      });
+      setMembersBulkResult(res);
+      setApplyUnitModalOpen(false);
+      if (res.failed.length === 0) {
+        setDeptSelectedUserIds([]);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to add members to unit.";
+      setMembersBulkResult({
+        target: { department_id: id },
+        succeeded_user_ids: [],
+        failed: deptSelectedUserIds.map((uid) => ({
+          user_id: uid,
+          code: "not_found" as BulkMembershipFailureCode,
+          error: msg,
+        })),
+      });
+      setApplyUnitModalOpen(false);
+    }
+  }
+
+  async function handleBulkRemoveFromDepartment() {
+    setMembersBulkResult(null);
+    if (deptSelectedUserIds.length === 0) return;
+    try {
+      const res = await bulkRemoveDeptMembers.mutateAsync({
+        user_ids: deptSelectedUserIds,
+        dry_run: false,
+      });
+      setMembersBulkResult(res);
+      setDeptSelectedUserIds([]);
+      setDeptMembersPage(1);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to remove members.";
+      setMembersBulkResult({
+        target: { department_id: id },
+        succeeded_user_ids: [],
+        failed: deptSelectedUserIds.map((uid) => ({
+          user_id: uid,
+          code: "not_in_department" as BulkMembershipFailureCode,
+          error: msg,
+        })),
+      });
     }
   }
 
@@ -226,12 +372,17 @@ export default function DepartmentDetailPage() {
 
   async function handleAssignToUnit() {
     setAssignError(null);
-    if (!assignOpen?.unit?.id || !assignUserId) return;
-    const unitId = assignOpen.unit.id;
+    setAssignResult(null);
+    if (!assignOpen?.unit?.id || assignSelectedUserIds.length === 0) return;
     try {
-      await updateUserFields.mutateAsync({ userId: assignUserId, payload: { unit: unitId } });
-      setAssignUserId("");
-      setAssignOpen(null);
+      const res = await bulkAddUnitMembers.mutateAsync({
+        user_ids: assignSelectedUserIds,
+        dry_run: false,
+        clear_conflicts: assignClearConflicts,
+      });
+      setAssignResult(res);
+      setAssignSelectedUserIds([]);
+      setAssignSearch("");
     } catch (e: unknown) {
       setAssignError(e instanceof Error ? e.message : "Failed to assign user to unit.");
     }
@@ -570,56 +721,157 @@ export default function DepartmentDetailPage() {
               </div>
             )}
             {tab === "members" && (
-              <div className="overflow-x-auto">
-                {members.length === 0 ? (
+              <div className="space-y-3">
+                {membersSorted.length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">
                     No members in this department.
                   </p>
                 ) : (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="px-4 py-2 text-left font-medium text-muted-foreground">
-                          Name
-                        </th>
-                        <th className="px-4 py-2 text-left font-medium text-muted-foreground">
-                          Email
-                        </th>
-                        <th className="px-4 py-2 text-right font-medium text-muted-foreground">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {members.map((m) => (
-                        <tr
-                          key={m.id}
-                          className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                  <>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-1 flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={openApplyUnitModal}
+                          disabled={
+                            pendingAny ||
+                            deptSelectedUserIds.length === 0 ||
+                            units.length === 0
+                          }
+                          title={
+                            units.length === 0
+                              ? "Create a unit in this department first"
+                              : undefined
+                          }
+                          className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
                         >
-                          <td className="px-4 py-3 font-medium text-foreground">
-                            {getMemberName(m)}
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground">
-                            {m.email}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex justify-end">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveMember(m.id)}
-                                disabled={pendingAny}
-                                className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold text-destructive transition hover:bg-destructive/10 disabled:opacity-60"
-                                aria-label={`Remove ${getMemberName(m)} from department`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Remove
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          Add To Unit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleBulkRemoveFromDepartment}
+                          disabled={pendingAny || deptSelectedUserIds.length === 0}
+                          title="Remove selected members from this department"
+                          aria-label="Remove selected members from this department"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive transition hover:bg-destructive/15 disabled:opacity-60"
+                        >
+                          <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
+                          Remove
+                        </button>
+
+                        <div className="relative w-full sm:w-64">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <input
+                            value={membersSearch}
+                            onChange={(e) => {
+                              setMembersSearch(e.target.value);
+                              setDeptMembersPage(1);
+                            }}
+                            placeholder="Search members…"
+                            className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring transition"
+                          />
+                        </div>
+
+                        <select
+                          value={membersUnitFilter}
+                          onChange={(e) => {
+                            setMembersUnitFilter(
+                              e.target.value as "" | "none" | string
+                            );
+                            setDeptMembersPage(1);
+                          }}
+                          className="w-full sm:w-56 rounded-lg border border-border bg-background px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring transition"
+                          aria-label="Filter by unit"
+                        >
+                          <option value="">All units</option>
+                          <option value="none">No unit</option>
+                          {units.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <Pagination
+                        page={deptMembersPage}
+                        pageSize={pageSize}
+                        total={filteredDepartmentMembers.length}
+                        onPageChange={setDeptMembersPage}
+                      />
+                    </div>
+
+                    <BulkResultPanel title="Bulk action result" result={membersBulkResult} />
+
+                    <div className="overflow-x-auto rounded-xl border border-border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border bg-muted/30">
+                            <th className="px-4 py-2 text-left font-medium text-muted-foreground">
+                              Select
+                            </th>
+                            <th className="px-4 py-2 text-left font-medium text-muted-foreground">
+                              Name
+                            </th>
+                            <th className="px-4 py-2 text-left font-medium text-muted-foreground">
+                              Email
+                            </th>
+                            <th className="px-4 py-2 text-right font-medium text-muted-foreground">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredDepartmentMembers
+                            .slice((deptMembersPage - 1) * pageSize, deptMembersPage * pageSize)
+                            .map((m) => {
+                              const checked = deptSelectedUserIds.includes(m.id);
+                              return (
+                                <tr
+                                  key={m.id}
+                                  className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                                >
+                                  <td className="px-4 py-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={(e) => toggleDeptSelected(m.id, e.target.checked)}
+                                      disabled={pendingAny}
+                                      className="h-4 w-4 rounded border-border accent-primary"
+                                      aria-label={`Select ${getMemberName(m)}`}
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3 font-medium text-foreground">
+                                    {getMemberName(m)}
+                                  </td>
+                                  <td className="px-4 py-3 text-muted-foreground">{m.email}</td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex justify-end">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveMember(m.id)}
+                                        disabled={pendingAny}
+                                        className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold text-destructive transition hover:bg-destructive/10 disabled:opacity-60"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        Remove
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <Pagination
+                      page={deptMembersPage}
+                      pageSize={pageSize}
+                      total={filteredDepartmentMembers.length}
+                      onPageChange={setDeptMembersPage}
+                      className="pt-2"
+                    />
+                  </>
                 )}
               </div>
             )}
@@ -679,7 +931,9 @@ export default function DepartmentDetailPage() {
                             type="button"
                             onClick={() => {
                               setAssignError(null);
-                              setAssignUserId("");
+                              setAssignResult(null);
+                              setAssignSelectedUserIds([]);
+                              setAssignSearch("");
                               setAssignOpen({ unit: u });
                             }}
                             disabled={pendingAny}
@@ -770,7 +1024,7 @@ export default function DepartmentDetailPage() {
       {/* Add member modal */}
       {addMemberOpen && (
         <Overlay onClose={() => setAddMemberOpen(false)}>
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+          <div className="w-full max-w-xl rounded-2xl border border-border bg-card p-6 shadow-xl">
             <h2 className="mb-4 text-lg font-semibold text-foreground">
               Add member
             </h2>
@@ -779,27 +1033,57 @@ export default function DepartmentDetailPage() {
                 {addMemberError}
               </p>
             )}
-            <div className="space-y-3">
-              <label className="block text-xs font-medium text-muted-foreground">
-                User
-              </label>
-              <select
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                className={cn(
-                  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
+            {addMemberResult && (
+              <div className="mb-4 space-y-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+                <p className="text-sm text-foreground">
+                  <span className="font-semibold">Added:</span>{" "}
+                  {addMemberResult.succeeded_user_ids.length}
+                  {addMemberResult.failed.length > 0 ? (
+                    <>
+                      {" "}
+                      <span className="text-muted-foreground">•</span>{" "}
+                      <span className="font-semibold">Failed:</span>{" "}
+                      {addMemberResult.failed.length}
+                    </>
+                  ) : null}
+                </p>
+                {addMemberResult.failed.length > 0 && (
+                  <ul className="max-h-32 overflow-auto text-xs text-muted-foreground">
+                    {addMemberResult.failed.map((f) => (
+                      <li key={f.user_id} className="py-1">
+                        <span className="font-semibold text-foreground">{f.code}</span>{" "}
+                        <span className="text-muted-foreground">({f.user_id}):</span>{" "}
+                        {f.error}
+                      </li>
+                    ))}
+                  </ul>
                 )}
-                aria-label="Select user to add"
-              >
-                <option value="">
-                  {usersLoading ? "Loading users…" : "Select a user"}
-                </option>
-                {eligibleUsersToAdd.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.full_name || getMemberName(u)} — {u.email}
-                  </option>
-                ))}
-              </select>
+              </div>
+            )}
+            <div className="space-y-3">
+              <BulkUserPicker
+                users={eligibleUsersToAdd}
+                selectedUserIds={addMemberSelectedUserIds}
+                onChangeSelectedUserIds={setAddMemberSelectedUserIds}
+                search={addMemberSearch}
+                onChangeSearch={setAddMemberSearch}
+                disabled={usersLoading || pendingAny}
+                label="Users"
+                emptyText={usersLoading ? "Loading users…" : "No eligible users."}
+              />
+
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={addMemberClearConflicts}
+                  onChange={(e) => setAddMemberClearConflicts(e.target.checked)}
+                  disabled={pendingAny}
+                  className="h-4 w-4 rounded border-border"
+                />
+                <span className="text-sm">
+                  Clear conflicts automatically (move/clear unit/team if needed)
+                </span>
+              </label>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -811,12 +1095,111 @@ export default function DepartmentDetailPage() {
                 <button
                   type="button"
                   onClick={handleAddMember}
-                  disabled={!selectedUserId || pendingAny}
+                  disabled={addMemberSelectedUserIds.length === 0 || pendingAny}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
                 >
-                  Add
+                  Add members
                 </button>
               </div>
+            </div>
+          </div>
+        </Overlay>
+      )}
+
+      {applyUnitModalOpen && (
+        <Overlay
+          onClose={() => {
+            setApplyUnitModalOpen(false);
+            setApplyUnitModalError(null);
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="mb-1 text-lg font-semibold text-foreground">
+              Add to Unit
+            </h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Choose which unit to add{" "}
+              <span className="font-medium text-foreground">
+                {deptSelectedUserIds.length}
+              </span>{" "}
+              selected member{deptSelectedUserIds.length !== 1 ? "s" : ""} to.
+            </p>
+            {units.length === 0 ? (
+              <p className="mb-4 rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                This department has no units yet. Create one under the Units tab,
+                then try again.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="apply-unit-select"
+                    className="mb-1.5 block text-xs font-medium text-muted-foreground"
+                  >
+                    Unit
+                  </label>
+                  <select
+                    id="apply-unit-select"
+                    value={applyUnitSelectedUnitId}
+                    onChange={(e) => {
+                      setApplyUnitSelectedUnitId(e.target.value);
+                      setApplyUnitModalError(null);
+                    }}
+                    disabled={pendingAny}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
+                  >
+                    <option value="">Select a unit…</option>
+                    {units.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <label className="flex cursor-pointer items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={applyUnitClearConflicts}
+                    onChange={(e) => setApplyUnitClearConflicts(e.target.checked)}
+                    disabled={pendingAny}
+                    className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+                  />
+                  <span className="text-muted-foreground">
+                    Clear conflicting memberships (e.g. other unit/team) when the
+                    API allows it.
+                  </span>
+                </label>
+              </div>
+            )}
+            {applyUnitModalError && (
+              <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {applyUnitModalError}
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setApplyUnitModalOpen(false);
+                  setApplyUnitModalError(null);
+                }}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmApplyUnitFromModal}
+                disabled={
+                  pendingAny ||
+                  units.length === 0 ||
+                  !applyUnitSelectedUnitId ||
+                  deptSelectedUserIds.length === 0
+                }
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+              >
+                Add To Unit
+              </button>
             </div>
           </div>
         </Overlay>
@@ -913,7 +1296,7 @@ export default function DepartmentDetailPage() {
       {/* Assign member to unit */}
       {assignOpen && (
         <Overlay onClose={() => setAssignOpen(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+          <div className="w-full max-w-xl rounded-2xl border border-border bg-card p-6 shadow-xl">
             <h2 className="mb-4 text-lg font-semibold text-foreground">
               Add member to {assignOpen.unit.name}
             </h2>
@@ -922,32 +1305,60 @@ export default function DepartmentDetailPage() {
                 {assignError}
               </p>
             )}
+            {assignResult && (
+              <div className="mb-4 space-y-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+                <p className="text-sm text-foreground">
+                  <span className="font-semibold">Added:</span>{" "}
+                  {assignResult.succeeded_user_ids.length}
+                  {assignResult.failed.length > 0 ? (
+                    <>
+                      {" "}
+                      <span className="text-muted-foreground">•</span>{" "}
+                      <span className="font-semibold">Failed:</span>{" "}
+                      {assignResult.failed.length}
+                    </>
+                  ) : null}
+                </p>
+                {assignResult.failed.length > 0 && (
+                  <ul className="max-h-32 overflow-auto text-xs text-muted-foreground">
+                    {assignResult.failed.map((f) => (
+                      <li key={f.user_id} className="py-1">
+                        <span className="font-semibold text-foreground">{f.code}</span>{" "}
+                        <span className="text-muted-foreground">({f.user_id}):</span>{" "}
+                        {f.error}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             <div className="space-y-3">
-              <label className="block text-xs font-medium text-muted-foreground">
-                Member
+              <BulkUserPicker
+                users={members.filter((m) => {
+                  const unitMemberIds = new Set((assignOpen.unit.members ?? []).map((x) => x.id));
+                  return !unitMemberIds.has(m.id);
+                })}
+                selectedUserIds={assignSelectedUserIds}
+                onChangeSelectedUserIds={setAssignSelectedUserIds}
+                search={assignSearch}
+                onChangeSearch={setAssignSearch}
+                disabled={pendingAny}
+                label="Members"
+                emptyText={members.length ? "No eligible members." : "No members."}
+              />
+
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={assignClearConflicts}
+                  onChange={(e) => setAssignClearConflicts(e.target.checked)}
+                  disabled={pendingAny}
+                  className="h-4 w-4 rounded border-border"
+                />
+                <span className="text-sm">
+                  Clear conflicts automatically (move/clear department/team if needed)
+                </span>
               </label>
-              <select
-                value={assignUserId}
-                onChange={(e) => setAssignUserId(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
-                aria-label="Select member to add to unit"
-              >
-                <option value="">
-                  {members.length ? "Select a member" : "No members"}
-                </option>
-                {members
-                  .filter((m) => {
-                    const unitMemberIds = new Set(
-                      (assignOpen.unit.members ?? []).map((x) => x.id)
-                    );
-                    return !unitMemberIds.has(m.id);
-                  })
-                  .map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {getMemberName(m)} — {m.email}
-                    </option>
-                  ))}
-              </select>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -959,10 +1370,10 @@ export default function DepartmentDetailPage() {
                 <button
                   type="button"
                   onClick={handleAssignToUnit}
-                  disabled={!assignUserId || pendingAny}
+                  disabled={assignSelectedUserIds.length === 0 || pendingAny}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
                 >
-                  Add
+                  Add members
                 </button>
               </div>
             </div>
