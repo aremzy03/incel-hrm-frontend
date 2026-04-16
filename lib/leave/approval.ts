@@ -1,5 +1,6 @@
 import type { User } from "@/lib/types/auth";
 import type { LeaveRequest, LeaveStatus } from "@/lib/types/leave";
+import { hasRole } from "@/lib/rbac";
 
 type RoleName =
   | "EMPLOYEE"
@@ -42,14 +43,17 @@ export function canUserActOnLeaveRequest(
   const status = request.status as LeaveStatus;
   const roles = (user.roles ?? []) as RoleName[];
 
-  if (status === "PENDING_SUPERVISOR") {
-    if (!roles.includes("SUPERVISOR")) return { canApprove: false, canReject: false };
+  if (status === "PENDING_SUPERVISOR" && hasRole(user, "SUPERVISOR")) {
     const userSupervisedUnitId = getUserSupervisedUnitId(user);
     const employeeUnitId = getEmployeeUnitId(request);
-    if (!userSupervisedUnitId || !employeeUnitId)
+    if (userSupervisedUnitId && employeeUnitId && userSupervisedUnitId !== employeeUnitId) {
       return { canApprove: false, canReject: false };
-    const ok = userSupervisedUnitId === employeeUnitId;
-    return { canApprove: ok, canReject: ok };
+    }
+    return { canApprove: true, canReject: true };
+  }
+
+  if (status === "PENDING_TEAM_LEAD" && hasRole(user, "TEAM_LEAD")) {
+    return { canApprove: true, canReject: true };
   }
 
   const can = roles.some((r) => {

@@ -22,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 type RoleName =
   | "EMPLOYEE"
   | "LINE_MANAGER"
+  | "TEAM_LEAD"
   | "SUPERVISOR"
   | "HR"
   | "EXECUTIVE_DIRECTOR"
@@ -46,6 +47,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     href: "/leave/admin",
     icon: CheckCircle,
     allowedRoles: [
+      "TEAM_LEAD",
       "SUPERVISOR",
       "LINE_MANAGER",
       "HR",
@@ -94,7 +96,7 @@ export default function LeaveLayout({
      * column below handles its own overflow-y-auto. The sidebar then fills
      * exactly the visible area without needing sticky/h-screen tricks.
      */
-    <div className="flex h-full bg-sidebar">
+    <div className="flex h-[calc(100vh-56px)] overflow-hidden bg-sidebar">
       {/* ── Sidebar ─────────────────────────────────────────────────── */}
       <aside
         className={cn(

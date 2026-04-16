@@ -45,6 +45,17 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+function formatRoles(roles: string[] | undefined | null): string {
+  if (!roles?.length) return "";
+  const unique = Array.from(new Set(roles.filter(Boolean)));
+  unique.sort((a, b) => {
+    if (a === "EMPLOYEE" && b !== "EMPLOYEE") return 1;
+    if (b === "EMPLOYEE" && a !== "EMPLOYEE") return -1;
+    return a.localeCompare(b);
+  });
+  return unique.map((r) => r.replace(/_/g, " ")).join(", ");
+}
+
 export default function HRMLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
@@ -195,7 +206,7 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
               {user?.full_name ?? "Loading..."}
             </p>
             <p className="text-xs text-muted-foreground">
-              {user?.roles?.[0] ?? ""}
+              {formatRoles(user?.roles)}
             </p>
           </div>
           </Link>

@@ -67,12 +67,14 @@ export function HolidayDatePicker({
   onChange,
   holidayNameByDate,
   min,
+  disableWeekendsAndHolidays,
   label,
 }: {
   value: string;
   onChange: (next: string) => void;
   holidayNameByDate: Map<string, string>;
   min?: string;
+  disableWeekendsAndHolidays?: boolean;
   label: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -197,7 +199,16 @@ export function HolidayDatePicker({
                 const holidayName = holidayNameByDate.get(ymd);
                 const weekend = isWeekend(cell.date);
                 const isSelected = value ? ymd === value : false;
-                const disabled = isBeforeMin(cell.date);
+                const disabled =
+                  isBeforeMin(cell.date) ||
+                  (disableWeekendsAndHolidays && (weekend || !!holidayName));
+                const disabledReason = isBeforeMin(cell.date)
+                  ? "Before minimum date"
+                  : disableWeekendsAndHolidays && weekend
+                    ? "Weekend"
+                    : disableWeekendsAndHolidays && holidayName
+                      ? `Public holiday: ${holidayName}`
+                      : null;
 
                 return (
                   <button
@@ -218,8 +229,8 @@ export function HolidayDatePicker({
                       isSelected && "bg-primary text-primary-foreground",
                       disabled && "cursor-not-allowed opacity-40 hover:bg-transparent"
                     )}
-                    title={holidayName ? `Public holiday: ${holidayName}` : undefined}
-                    aria-label={holidayName ? `${ymd} ${holidayName}` : ymd}
+                    title={disabledReason ?? (holidayName ? `Public holiday: ${holidayName}` : undefined)}
+                    aria-label={disabledReason ? `${ymd} (${disabledReason})` : holidayName ? `${ymd} ${holidayName}` : ymd}
                   >
                     {holidayName && (
                       <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-500" />

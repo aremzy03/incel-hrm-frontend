@@ -4,6 +4,7 @@ import type {
   BulkMembershipRequest,
   BulkMembershipRemoveRequest,
   BulkMembershipResponse,
+  LineManagerPayload,
   PaginatedResponse,
   Team,
   TeamCreatePayload,
@@ -99,12 +100,13 @@ export function useRemoveTeamMember(unitId: string) {
 export function useSetTeamLead(unitId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ teamId, payload }: { teamId: string; payload: TeamUserActionPayload }) =>
-      apiPost<Team>(`teams/${teamId}/set-lead/`, payload),
+    mutationFn: ({ teamId, payload }: { teamId: string; payload: LineManagerPayload }) =>
+      apiPost<void>(`teams/${teamId}/team-lead/`, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["teams", unitId] });
       qc.invalidateQueries({ queryKey: ["team"] });
       qc.invalidateQueries({ queryKey: ["unit-detail", unitId] });
+      qc.invalidateQueries({ queryKey: ["users"] });
     },
   });
 }
@@ -113,11 +115,12 @@ export function useClearTeamLead(unitId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ teamId }: { teamId: string }) =>
-      apiPost<Team>(`teams/${teamId}/clear-lead/`, {}),
+      apiDelete<void>(`teams/${teamId}/team-lead/`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["teams", unitId] });
       qc.invalidateQueries({ queryKey: ["team"] });
       qc.invalidateQueries({ queryKey: ["unit-detail", unitId] });
+      qc.invalidateQueries({ queryKey: ["users"] });
     },
   });
 }

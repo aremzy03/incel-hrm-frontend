@@ -12,7 +12,7 @@ import { useLeaveTypes } from "@/lib/api/leave-types";
 import { useAuth } from "@/contexts/AuthContext";
 import { HolidayDatePicker } from "@/components/hrm/leave/HolidayDatePicker";
 import { listPublicHolidays } from "@/lib/api/public-holidays";
-import { buildHolidayLookup, countWorkingDaysPreview } from "@/lib/public-holidays/utils";
+import { buildHolidayLookup, countWorkingDaysPreview, toYmd } from "@/lib/public-holidays/utils";
 import type { PublicHoliday } from "@/lib/types/public-holidays";
 import type {
   LeaveType,
@@ -194,6 +194,19 @@ export default function ApplyLeavePage() {
   const [submitted, setSubmitted] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [overlapConfirmOpen, setOverlapConfirmOpen] = useState(false);
+
+  const minStartDate = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 1);
+    return toYmd(d);
+  }, []);
+
+  const minEndDate = useMemo(() => {
+    const base = startDate ? new Date(startDate + "T00:00:00") : new Date(minStartDate + "T00:00:00");
+    base.setDate(base.getDate() + 1);
+    return toYmd(base);
+  }, [minStartDate, startDate]);
 
   const deptId =
     typeof user?.department === "string"
@@ -496,9 +509,17 @@ export default function ApplyLeavePage() {
                     value={startDate}
                     onChange={(next) => {
                       setStartDate(next);
-                      if (endDate && next && endDate < next) setEndDate(next);
+                      if (next) {
+                        const nextMinEnd = toYmd(new Date(next + "T00:00:00"));
+                        const d = new Date(nextMinEnd + "T00:00:00");
+                        d.setDate(d.getDate() + 1);
+                        const requiredEnd = toYmd(d);
+                        if (!endDate || endDate < requiredEnd) setEndDate(requiredEnd);
+                      }
                     }}
                     holidayNameByDate={holidayNameByDate}
+                    min={minStartDate}
+                    disableWeekendsAndHolidays
                   />
                 </div>
                 <div>
@@ -507,8 +528,9 @@ export default function ApplyLeavePage() {
                     label="End date"
                     value={endDate}
                     onChange={setEndDate}
-                    min={startDate || undefined}
+                    min={minEndDate}
                     holidayNameByDate={holidayNameByDate}
+                    disableWeekendsAndHolidays
                   />
                 </div>
               </div>

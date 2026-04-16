@@ -6,16 +6,14 @@ import {
   Pencil,
   Trash2,
   Search,
-  ShieldCheck,
   Eye,
   EyeOff,
   X,
   ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useAssignRole, useRemoveRole } from "@/lib/api/users";
+import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from "@/lib/api/users";
 import { useDepartments } from "@/lib/api/departments";
-import { useRoles } from "@/lib/api/roles";
 import type { User, UserCreatePayload, UserUpdatePayload } from "@/lib/types/auth";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -36,9 +34,21 @@ function roleBadgeClass(role: string) {
     MANAGING_DIRECTOR: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
     LINE_MANAGER: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
     SUPERVISOR: "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
+    TEAM_LEAD: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300",
     EMPLOYEE: "bg-muted text-muted-foreground",
   };
   return map[role] ?? "bg-muted text-muted-foreground";
+}
+
+function normalizeRoles(roles: string[] | undefined | null): string[] {
+  const list = (roles ?? []).filter(Boolean);
+  const unique = Array.from(new Set(list));
+  unique.sort((a, b) => {
+    if (a === "EMPLOYEE" && b !== "EMPLOYEE") return 1;
+    if (b === "EMPLOYEE" && a !== "EMPLOYEE") return -1;
+    return a.localeCompare(b);
+  });
+  return unique;
 }
 
 // ─── Create / Edit Modal ──────────────────────────────────────────────────────
@@ -224,108 +234,6 @@ function UserFormModal({ mode, user, departments, onClose }: UserFormModalProps)
   );
 }
 
-// ─── Role Manager ─────────────────────────────────────────────────────────────
-// User can only have one role. Selecting a new role overwrites the current one.
-
-interface RoleManagerProps {
-  user: User;
-  allRoles: { id: string; name: string }[];
-  onClose: () => void;
-}
-
-function RoleManager({ user, allRoles, onClose }: RoleManagerProps) {
-  const assignRole = useAssignRole();
-  const removeRole = useRemoveRole();
-  const [busy, setBusy] = useState<string | null>(null);
-
-  const currentRole = user.roles?.[0] ?? null;
-  const currentRoleRecord = allRoles.find((r) => r.name === currentRole);
-
-  async function selectRole(role: { id: string; name: string } | null) {
-    if (!role) {
-      if (!currentRoleRecord) return;
-      setBusy("remove");
-      try {
-        await removeRole.mutateAsync({ userId: user.id, roleId: currentRoleRecord.id });
-      } finally {
-        setBusy(null);
-      }
-      return;
-    }
-
-    setBusy(role.id);
-    try {
-      if (currentRoleRecord && currentRoleRecord.id !== role.id) {
-        await removeRole.mutateAsync({ userId: user.id, roleId: currentRoleRecord.id });
-      }
-      await assignRole.mutateAsync({ userId: user.id, payload: { role_id: role.id } });
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
-    <Overlay onClose={onClose}>
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl">
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">
-            Assign Role
-          </h2>
-          <p className="text-xs text-muted-foreground">{user.full_name}</p>
-        </div>
-        <p className="mb-4 text-xs text-muted-foreground">
-          One role per user. Selecting a role overwrites the current assignment.
-        </p>
-        <div className="space-y-2">
-          <button
-            onClick={() => selectRole(null)}
-            disabled={busy === "remove" || !currentRoleRecord}
-            className={cn(
-              "flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm font-medium transition",
-              !currentRoleRecord
-                ? "border-primary/40 bg-primary/10 text-primary"
-                : "border-border bg-background text-foreground hover:bg-muted"
-            )}
-          >
-            <span>No role</span>
-            {busy === "remove" ? (
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />
-            ) : (
-              <span className={cn("h-2 w-2 rounded-full", !currentRoleRecord ? "bg-primary" : "bg-muted-foreground/30")} />
-            )}
-          </button>
-          {allRoles.map((role) => {
-            const active = currentRole === role.name;
-            return (
-              <button
-                key={role.id}
-                onClick={() => selectRole(role)}
-                disabled={busy === role.id}
-                className={cn(
-                  "flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm font-medium transition",
-                  active
-                    ? "border-primary/40 bg-primary/10 text-primary"
-                    : "border-border bg-background text-foreground hover:bg-muted"
-                )}
-              >
-                <span>{role.name.replace(/_/g, " ")}</span>
-                {busy === role.id ? (
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />
-                ) : (
-                  <span className={cn("h-2 w-2 rounded-full", active ? "bg-primary" : "bg-muted-foreground/30")} />
-                )}
-              </button>
-            );
-          })}
-        </div>
-        <button onClick={onClose} className="mt-4 w-full rounded-lg border border-border py-2 text-sm font-medium transition hover:bg-muted">
-          Done
-        </button>
-      </div>
-    </Overlay>
-  );
-}
-
 // ─── Delete Confirm ───────────────────────────────────────────────────────────
 
 interface ConfirmDeleteProps {
@@ -380,19 +288,16 @@ function Overlay({ children, onClose }: { children: React.ReactNode; onClose: ()
 export function UsersTab() {
   const { data: usersData, isLoading: usersLoading } = useUsers();
   const { data: deptsData } = useDepartments();
-  const { data: rolesData } = useRoles();
   const deleteUser = useDeleteUser();
 
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
-  const [rolesUser, setRolesUser] = useState<User | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [deptFilter, setDeptFilter] = useState("");
 
   const users = usersData?.results ?? [];
   const departments = deptsData?.results ?? [];
-  const allRoles = rolesData?.results ?? [];
 
   const filtered = users.filter((u) => {
     const q = search.toLowerCase();
@@ -489,10 +394,20 @@ export function UsersTab() {
                         {dept?.name ?? <span className="italic text-muted-foreground/60">—</span>}
                       </td>
                       <td className="px-4 py-3">
-                        {u.roles?.[0] ? (
-                          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roleBadgeClass(u.roles[0]))}>
-                            {u.roles[0].replace(/_/g, " ")}
-                          </span>
+                        {normalizeRoles(u.roles).length ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {normalizeRoles(u.roles).map((role) => (
+                              <span
+                                key={role}
+                                className={cn(
+                                  "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                                  roleBadgeClass(role)
+                                )}
+                              >
+                                {role.replace(/_/g, " ")}
+                              </span>
+                            ))}
+                          </div>
                         ) : (
                           <span className="text-xs text-muted-foreground/60">No role</span>
                         )}
@@ -504,13 +419,6 @@ export function UsersTab() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => setRolesUser(u)}
-                            title="Assign role"
-                            className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                          >
-                            <ShieldCheck className="h-4 w-4" />
-                          </button>
                           <button
                             onClick={() => setEditUser(u)}
                             title="Edit user"
@@ -548,9 +456,6 @@ export function UsersTab() {
       )}
       {editUser && (
         <UserFormModal mode="edit" user={editUser} departments={departments} onClose={() => setEditUser(null)} />
-      )}
-      {rolesUser && (
-        <RoleManager user={rolesUser} allRoles={allRoles} onClose={() => setRolesUser(null)} />
       )}
       {deleteTarget && (
         <ConfirmDelete

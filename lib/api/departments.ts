@@ -83,7 +83,12 @@ export function useAssignLineManager(deptId: string) {
   return useMutation({
     mutationFn: (payload: LineManagerPayload) =>
       apiPost<void>(`departments/${deptId}/line-manager/`, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: DEPTS_KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: DEPTS_KEY });
+      qc.invalidateQueries({ queryKey: ["department-detail", deptId] });
+      qc.invalidateQueries({ queryKey: ["department-members", deptId] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
   });
 }
 
@@ -91,7 +96,12 @@ export function useRemoveLineManager(deptId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => apiDelete<void>(`departments/${deptId}/line-manager/`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: DEPTS_KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: DEPTS_KEY });
+      qc.invalidateQueries({ queryKey: ["department-detail", deptId] });
+      qc.invalidateQueries({ queryKey: ["department-members", deptId] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
   });
 }
 

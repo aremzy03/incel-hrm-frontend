@@ -1,12 +1,15 @@
 export class ApiError extends Error {
   status: number;
-  data: Record<string, unknown>;
+  data: unknown;
 
-  constructor(status: number, data: Record<string, unknown>) {
-    const message =
-      typeof data?.detail === "string"
-        ? data.detail
-        : "An error occurred";
+  constructor(status: number, data: unknown) {
+    const detail =
+      typeof (data as any)?.detail === "string"
+        ? ((data as any).detail as string)
+        : typeof data === "string"
+          ? data
+          : undefined;
+    const message = detail || "An error occurred";
     super(message);
     this.name = "ApiError";
     this.status = status;
@@ -17,7 +20,16 @@ export class ApiError extends Error {
 async function handleResponse<T>(res: Response): Promise<T> {
   if (res.status === 204) return undefined as T;
 
-  const data = await res.json().catch(() => ({}));
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    // Backend might return HTML/plain-text for errors; keep it visible.
+    const text = await res.text().catch(() => "");
+    data = {
+      detail: text || res.statusText || `Request failed (${res.status})`,
+    };
+  }
 
   if (!res.ok) {
     throw new ApiError(res.status, data);

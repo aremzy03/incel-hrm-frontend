@@ -67,7 +67,7 @@ export default function DepartmentDetailPage() {
   const id = params.id as string;
   const { data, isLoading, error } = useDepartmentDetail(id);
   const { data: deptsData } = useDepartments();
-  const [tab, setTab] = useState<"manage" | "members" | "units">("manage");
+  const [tab, setTab] = useState<"manage" | "members" | "units">("members");
 
   const { data: usersData, isLoading: usersLoading } = useUsers();
   const allUsers = usersData?.results ?? [];
@@ -913,34 +913,6 @@ export default function DepartmentDetailPage() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSupervisorError(null);
-                              setSupervisorUserId(u.supervisor?.id ?? "");
-                              setSupervisorOpen({ unit: u });
-                            }}
-                            disabled={pendingAny}
-                            className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold transition hover:bg-muted disabled:opacity-60"
-                            aria-label={`Assign supervisor for unit ${u.name}`}
-                          >
-                            <Shield className="h-4 w-4" />
-                            {u.supervisor ? "Change supervisor" : "Assign supervisor"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAssignError(null);
-                              setAssignResult(null);
-                              setAssignSelectedUserIds([]);
-                              setAssignSearch("");
-                              setAssignOpen({ unit: u });
-                            }}
-                            disabled={pendingAny}
-                            className="rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold transition hover:bg-muted disabled:opacity-60"
-                          >
-                            Add member to unit
-                          </button>
                           <button
                             type="button"
                             onClick={() => {

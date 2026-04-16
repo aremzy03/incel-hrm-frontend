@@ -71,6 +71,17 @@ function getActionIcon(action: string) {
   }
 }
 
+function approvalLogTitle(log: LeaveApprovalLog): string {
+  switch (log.action) {
+    case "MODIFY":
+      return "Request Sent";
+    case "APPROVE":
+      return "Approved";
+    default:
+      return log.action_display;
+  }
+}
+
 type ApprovalModalAction = "approve" | "reject";
 
 function ApproverConfirmModal({
@@ -234,7 +245,8 @@ export default function LeaveRequestDetailPage({
 
   const isPending = (request?.status as string | undefined)?.startsWith("PENDING");
   const { canApprove, canReject } = canUserActOnLeaveRequest(user, request);
-  const showApproverActions = !!request && !!isPending && canApprove && canReject;
+  const showApproverActions =
+    !!request && !!isPending && canApprove && canReject && !isOwner;
   const canOwnerCancel =
     !!request &&
     isOwner &&
@@ -781,7 +793,7 @@ export default function LeaveRequestDetailPage({
 
                       <div className={cn("pb-4", isLast && "pb-0")}>
                         <p className="text-sm font-medium text-foreground">
-                          {log.action_display}
+                          {approvalLogTitle(log)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           by {actorName} &middot;{" "}

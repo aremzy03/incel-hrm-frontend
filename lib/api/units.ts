@@ -9,6 +9,7 @@ import type {
   BulkMembershipRequest,
   BulkMembershipRemoveRequest,
   BulkMembershipResponse,
+  LineManagerPayload,
   Unit,
   UnitCreatePayload,
   UnitDetail,
@@ -68,6 +69,39 @@ export function useDeleteUnit() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["units"] });
       qc.invalidateQueries({ queryKey: ["departments"] });
+    },
+  });
+}
+
+export function useAssignUnitSupervisor(unitId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: LineManagerPayload) =>
+      apiPost<void>(`units/${unitId}/supervisor/`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["unit-detail", unitId] });
+      qc.invalidateQueries({ queryKey: ["units"] });
+      qc.invalidateQueries({ queryKey: ["departments"] });
+      qc.invalidateQueries({ queryKey: ["department-detail"] });
+      qc.invalidateQueries({ queryKey: ["department-members"] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["teams", unitId] });
+    },
+  });
+}
+
+export function useRemoveUnitSupervisor(unitId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiDelete<void>(`units/${unitId}/supervisor/`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["unit-detail", unitId] });
+      qc.invalidateQueries({ queryKey: ["units"] });
+      qc.invalidateQueries({ queryKey: ["departments"] });
+      qc.invalidateQueries({ queryKey: ["department-detail"] });
+      qc.invalidateQueries({ queryKey: ["department-members"] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["teams", unitId] });
     },
   });
 }

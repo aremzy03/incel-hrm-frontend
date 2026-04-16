@@ -157,14 +157,14 @@ export function NotificationsDrawer({
             </div>
           ) : (
             <ul className="space-y-2">
-              {notifications.map((n) => {
+              {notifications.map((n, idx) => {
                 const href = getLeaveHref(n);
                 const unread = n.is_read === false;
                 const Wrapper: React.ElementType = href ? Link : "div";
                 const wrapperProps = href ? { href } : {};
 
                 return (
-                  <li key={n.notification_id}>
+                  <li key={`${n.notification_id}-${n.created_at ?? idx}`}>
                     <Wrapper
                       {...wrapperProps}
                       className={cn(

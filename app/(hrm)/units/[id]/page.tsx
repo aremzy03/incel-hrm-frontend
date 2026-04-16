@@ -9,6 +9,8 @@ import {
   useUnitDetail,
   useUnits,
   useDeleteUnit,
+  useAssignUnitSupervisor,
+  useRemoveUnitSupervisor,
   useUpdateUnit,
 } from "@/lib/api/units";
 import { useDepartmentMembers } from "@/lib/api/departments";
@@ -76,6 +78,8 @@ export default function UnitDetailPage() {
   const { data, isLoading, error } = useUnitDetail(id);
   const updateUnit = useUpdateUnit(id);
   const deleteUnit = useDeleteUnit();
+  const assignSupervisor = useAssignUnitSupervisor(id);
+  const removeSupervisor = useRemoveUnitSupervisor(id);
   const { user } = useAuth();
 
   const deptId = data?.department?.id ?? "";
@@ -96,7 +100,7 @@ export default function UnitDetailPage() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const [tab, setTab] = useState<"manage" | "members" | "teams">("manage");
+  const [tab, setTab] = useState<"manage" | "members" | "teams">("members");
 
   const canManageTeams = hasRole(user, "HR", "LINE_MANAGER");
   const { data: teams = [], isLoading: teamsLoading } = useTeams(id);
@@ -124,6 +128,11 @@ export default function UnitDetailPage() {
   const [teamMembersSearch, setTeamMembersSearch] = useState("");
   const [teamMembersSelectedUserIds, setTeamMembersSelectedUserIds] = useState<string[]>([]);
   const [teamMembersResult, setTeamMembersResult] = useState<BulkMembershipResponse | null>(null);
+
+  const [teamLeadOpen, setTeamLeadOpen] = useState(false);
+  const [teamLeadTeam, setTeamLeadTeam] = useState<Team | null>(null);
+  const [teamLeadUserId, setTeamLeadUserId] = useState("");
+  const [teamLeadError, setTeamLeadError] = useState<string | null>(null);
 
   const pageSize = 20;
   const [unitMembersPage, setUnitMembersPage] = useState(1);
@@ -204,6 +213,8 @@ export default function UnitDetailPage() {
   const pendingAny =
     updateUnit.isPending ||
     deleteUnit.isPending ||
+    assignSupervisor.isPending ||
+    removeSupervisor.isPending ||
     createTeam.isPending ||
     updateTeam.isPending ||
     deleteTeam.isPending ||
@@ -361,9 +372,11 @@ export default function UnitDetailPage() {
   async function handleSaveSupervisor() {
     setSupervisorError(null);
     try {
-      await updateUnit.mutateAsync({
-        supervisor_id: supervisorId ? supervisorId : null,
-      });
+      if (supervisorId) {
+        await assignSupervisor.mutateAsync({ user_id: supervisorId });
+      } else {
+        await removeSupervisor.mutateAsync();
+      }
       setSupervisorOpen(false);
     } catch (e: unknown) {
       setSupervisorError(
@@ -754,6 +767,46 @@ export default function UnitDetailPage() {
                                 <button
                                   type="button"
                                   onClick={() => {
+                                    setTeamLeadError(null);
+                                    setTeamLeadTeam(t);
+                                    setTeamLeadUserId(t.team_lead?.id ?? "");
+                                    setTeamLeadOpen(true);
+                                  }}
+                                  disabled={!canManageTeams || pendingAny}
+                                  title={t.team_lead ? "Change team lead" : "Assign team lead"}
+                                  aria-label={t.team_lead ? "Change team lead" : "Assign team lead"}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition hover:bg-muted disabled:opacity-60"
+                                >
+                                  <Shield className="h-4 w-4" aria-hidden />
+                                </button>
+                                {t.team_lead && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!canManageTeams) return;
+                                      setTeamLeadError(null);
+                                      try {
+                                        await clearLead.mutateAsync({ teamId: t.id });
+                                      } catch (e: unknown) {
+                                        setTeamLeadError(
+                                          e instanceof Error ? e.message : "Failed to revoke team lead."
+                                        );
+                                        setTeamLeadTeam(t);
+                                        setTeamLeadUserId(t.team_lead?.id ?? "");
+                                        setTeamLeadOpen(true);
+                                      }
+                                    }}
+                                    disabled={!canManageTeams || pendingAny}
+                                    title="Revoke team lead"
+                                    aria-label="Revoke team lead"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-destructive/30 bg-destructive/10 text-destructive transition hover:bg-destructive/15 disabled:opacity-60"
+                                  >
+                                    <Shield className="h-4 w-4" aria-hidden />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
                                     setTeamEditError(null);
                                     setTeamEditId(t.id);
                                     setTeamEditName(t.name);
@@ -761,9 +814,11 @@ export default function UnitDetailPage() {
                                     setTeamEditOpen(true);
                                   }}
                                   disabled={!canManageTeams || pendingAny}
-                                  className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-semibold transition hover:bg-muted disabled:opacity-60"
+                                  title="Edit team"
+                                  aria-label="Edit team"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition hover:bg-muted disabled:opacity-60"
                                 >
-                                  Edit
+                                  <Pencil className="h-4 w-4" aria-hidden />
                                 </button>
                                 <button
                                   type="button"
@@ -776,9 +831,11 @@ export default function UnitDetailPage() {
                                     setTeamMembersOpen(true);
                                   }}
                                   disabled={!canManageTeams || pendingAny}
-                                  className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-semibold transition hover:bg-muted disabled:opacity-60"
+                                  title="View team members"
+                                  aria-label="View team members"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition hover:bg-muted disabled:opacity-60"
                                 >
-                                  Members
+                                  <Users className="h-4 w-4" aria-hidden />
                                 </button>
                                 <button
                                   type="button"
@@ -790,9 +847,11 @@ export default function UnitDetailPage() {
                                     }
                                   }}
                                   disabled={!canManageTeams || pendingAny}
-                                  className="rounded-md bg-destructive px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+                                  title="Delete team"
+                                  aria-label="Delete team"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-destructive text-white transition hover:opacity-90 disabled:opacity-60"
                                 >
-                                  Delete
+                                  <Trash2 className="h-4 w-4" aria-hidden />
                                 </button>
                               </div>
                             </td>
@@ -905,8 +964,16 @@ export default function UnitDetailPage() {
                 <button
                   type="button"
                   onClick={async () => {
-                    setSupervisorId("");
-                    await handleSaveSupervisor();
+                    setSupervisorError(null);
+                    try {
+                      await removeSupervisor.mutateAsync();
+                      setSupervisorId("");
+                      setSupervisorOpen(false);
+                    } catch (e: unknown) {
+                      setSupervisorError(
+                        e instanceof Error ? e.message : "Failed to remove supervisor."
+                      );
+                    }
                   }}
                   disabled={pendingAny}
                   className="w-full rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive transition hover:bg-destructive/15 disabled:opacity-60"
@@ -1487,6 +1554,91 @@ export default function UnitDetailPage() {
                   className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
                 >
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </Overlay>
+      )}
+
+      {/* Assign / change team lead modal */}
+      {teamLeadOpen && teamLeadTeam && (
+        <Overlay
+          onClose={() => {
+            setTeamLeadOpen(false);
+            setTeamLeadTeam(null);
+            setTeamLeadError(null);
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="mb-1 text-lg font-semibold text-foreground">Team Lead</h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              {teamLeadTeam.name}
+            </p>
+            {teamLeadError && (
+              <p className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {teamLeadError}
+              </p>
+            )}
+            <div className="space-y-3">
+              <label className="block text-xs font-medium text-muted-foreground">
+                Assign lead
+              </label>
+              <select
+                value={teamLeadUserId}
+                onChange={(e) => setTeamLeadUserId(e.target.value)}
+                disabled={!canManageTeams || pendingAny}
+                className={cn(
+                  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
+                )}
+                aria-label="Select team lead"
+              >
+                <option value="">None</option>
+                {(data?.members ?? []).map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {getMemberName(m)} — {m.email}
+                  </option>
+                ))}
+              </select>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTeamLeadOpen(false);
+                    setTeamLeadTeam(null);
+                    setTeamLeadError(null);
+                  }}
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!teamLeadTeam) return;
+                    setTeamLeadError(null);
+                    try {
+                      if (teamLeadUserId) {
+                        await setLead.mutateAsync({
+                          teamId: teamLeadTeam.id,
+                          payload: { user_id: teamLeadUserId },
+                        });
+                      } else {
+                        await clearLead.mutateAsync({ teamId: teamLeadTeam.id });
+                      }
+                      setTeamLeadOpen(false);
+                      setTeamLeadTeam(null);
+                    } catch (e: unknown) {
+                      setTeamLeadError(
+                        e instanceof Error ? e.message : "Failed to update team lead."
+                      );
+                    }
+                  }}
+                  disabled={!canManageTeams || pendingAny}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+                >
+                  Save
                 </button>
               </div>
             </div>
