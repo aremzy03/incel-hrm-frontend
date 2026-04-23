@@ -22,8 +22,8 @@ function BrandPanel() {
 
       <div className="relative z-10 flex items-center gap-3">
         <img
-          src="/incel-icon.png"
-          alt="Incel Group logo"
+          src="/hrm logo.png"
+          alt="HRM logo"
           className="h-12 w-12"
         />
         <div className="leading-none">
@@ -118,8 +118,8 @@ export default function LoginPage() {
         <div className="w-full max-w-[360px]">
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
             <img
-              src="/incel-icon.png"
-              alt="Incel Group logo"
+              src="/hrm logo.png"
+              alt="HRM logo"
               className="h-12 w-12"
             />
             <span className="font-serif font-semibold text-base text-foreground">

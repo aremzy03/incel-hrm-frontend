@@ -7,10 +7,10 @@ export const metadata: Metadata = {
   description: "Human Resource Management Application",
   icons: {
     icon: [
-      { url: "/incel-icon.svg", type: "image/svg+xml" },
+      { url: "/hrm logo.png", type: "image/png" },
     ],
     apple: [
-      { url: "/incel-icon.png", type: "image/png" },
+      { url: "/hrm logo.png", type: "image/png" },
     ],
   },
 };

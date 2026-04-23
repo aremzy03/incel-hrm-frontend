@@ -100,8 +100,8 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
           className="flex shrink-0 items-center gap-2.5 mr-2"
         >
           <img
-            src="/incel-icon.png"
-            alt="Incel Group logo"
+            src="/hrm logo.png"
+            alt="HRM logo"
             className="h-10 w-10"
           />
           <div className="hidden sm:block leading-none">
