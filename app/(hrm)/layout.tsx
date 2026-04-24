@@ -100,7 +100,7 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
           className="flex shrink-0 items-center gap-2.5 mr-2"
         >
           <img
-            src="/hrm logo.png"
+            src="/hrm-logo.png"
             alt="HRM logo"
             className="h-10 w-10"
           />

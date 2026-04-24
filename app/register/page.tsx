@@ -72,7 +72,7 @@ function BrandPanel() {
 
       <div className="relative z-10 flex items-center gap-3">
         <img
-          src="/hrm logo.png"
+          src="/hrm-logo.png"
           alt="HRM logo"
           className="h-12 w-12"
         />
@@ -255,7 +255,7 @@ export default function RegisterPage() {
         <div className="w-full max-w-[400px]">
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
             <img
-              src="/hrm logo.png"
+              src="/hrm-logo.png"
               alt="HRM logo"
               className="h-12 w-12"
             />
