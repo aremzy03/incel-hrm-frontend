@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Plus,
   Pencil,
@@ -9,11 +9,12 @@ import {
   Eye,
   EyeOff,
   X,
-  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from "@/lib/api/users";
-import { useDepartments } from "@/lib/api/departments";
+import { useUsersPage, useCreateUser, useUpdateUser, useDeleteUser } from "@/lib/api/users";
 import type { User, UserCreatePayload, UserUpdatePayload } from "@/lib/types/auth";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -22,9 +23,9 @@ function getInitials(name: string) {
   return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 }
 
-function getDepartmentId(dept: User["department"]): string {
-  if (!dept) return "";
-  return typeof dept === "string" ? dept : dept.id;
+function getDepartmentName(dept: User["department"]): string | null {
+  if (!dept) return null;
+  return typeof dept === "string" ? dept : dept.name ?? dept.id;
 }
 
 function roleBadgeClass(role: string) {
@@ -56,11 +57,10 @@ function normalizeRoles(roles: string[] | undefined | null): string[] {
 interface UserFormModalProps {
   mode: "create" | "edit";
   user?: User;
-  departments: { id: string; name: string }[];
   onClose: () => void;
 }
 
-function UserFormModal({ mode, user, departments, onClose }: UserFormModalProps) {
+function UserFormModal({ mode, user, onClose }: UserFormModalProps) {
   const createUser = useCreateUser();
   const updateUser = useUpdateUser(user?.id ?? "");
 
@@ -72,7 +72,6 @@ function UserFormModal({ mode, user, departments, onClose }: UserFormModalProps)
     gender: (user?.gender ?? "") as "" | "MALE" | "FEMALE",
     date_of_birth: user?.date_of_birth ?? "",
     phone: user?.phone ?? "",
-    department: getDepartmentId(user?.department ?? null),
     is_active: user?.is_active ?? true,
   });
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +92,6 @@ function UserFormModal({ mode, user, departments, onClose }: UserFormModalProps)
           gender: form.gender as "MALE" | "FEMALE",
           date_of_birth: form.date_of_birth,
           phone: form.phone.trim() || undefined,
-          department: form.department || undefined,
         };
         await createUser.mutateAsync(payload);
       } else {
@@ -103,7 +101,6 @@ function UserFormModal({ mode, user, departments, onClose }: UserFormModalProps)
           gender: form.gender || undefined,
           date_of_birth: form.date_of_birth || null,
           phone: form.phone.trim() || undefined,
-          department: form.department || null,
           is_active: form.is_active,
         };
         await updateUser.mutateAsync(payload);
@@ -206,15 +203,6 @@ function UserFormModal({ mode, user, departments, onClose }: UserFormModalProps)
             <label className="mb-1 block text-xs font-medium text-muted-foreground">Phone</label>
             <input className={fieldCls} value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="+234..." />
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">Department</label>
-            <select className={fieldCls} value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}>
-              <option value="">— No department —</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-          </div>
           {mode === "edit" && (
             <label className="flex cursor-pointer items-center gap-2.5 text-sm text-foreground">
               <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} className="h-4 w-4 rounded border-border accent-primary" />
@@ -286,28 +274,31 @@ function Overlay({ children, onClose }: { children: React.ReactNode; onClose: ()
 // ─── Main Users Tab ───────────────────────────────────────────────────────────
 
 export function UsersTab() {
-  const { data: usersData, isLoading: usersLoading } = useUsers();
-  const { data: deptsData } = useDepartments();
+  const [page, setPage] = useState(1);
   const deleteUser = useDeleteUser();
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
-  const [deptFilter, setDeptFilter] = useState("");
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 350);
+    return () => window.clearTimeout(handle);
+  }, [search]);
+
+  const { data: usersData, isLoading: usersLoading } = useUsersPage({
+    page,
+    search: debouncedSearch || undefined,
+  });
 
   const users = usersData?.results ?? [];
-  const departments = deptsData?.results ?? [];
-
-  const filtered = users.filter((u) => {
-    const q = search.toLowerCase();
-    const matchesSearch =
-      !q ||
-      u.full_name.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q);
-    const matchesDept = !deptFilter || getDepartmentId(u.department) === deptFilter;
-    return matchesSearch && matchesDept;
-  });
+  const total = usersData?.count ?? users.length;
+  const canPrev = !!usersData?.previous && page > 1;
+  const canNext = !!usersData?.next;
 
   return (
     <div className="space-y-4">
@@ -322,23 +313,13 @@ export function UsersTab() {
             className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
           />
           {search && (
-            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
               <X className="h-3.5 w-3.5" />
             </button>
           )}
-        </div>
-        <div className="relative">
-          <select
-            value={deptFilter}
-            onChange={(e) => setDeptFilter(e.target.value)}
-            className="appearance-none rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
-          >
-            <option value="">All departments</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
         </div>
         <button
           onClick={() => setCreateOpen(true)}
@@ -368,30 +349,37 @@ export function UsersTab() {
                     <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : users.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
                     No users found.
                   </td>
                 </tr>
               ) : (
-                filtered.map((u) => {
-                  const dept = departments.find((d) => d.id === getDepartmentId(u.department));
+                users.map((u) => {
+                  const deptName = getDepartmentName(u.department);
                   return (
                     <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
+                        <Link
+                          href={`/users/${u.id}`}
+                          className="flex items-center gap-3 rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                        >
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
                             {getInitials(u.full_name)}
                           </div>
-                          <div>
-                            <p className="font-medium text-foreground">{u.full_name}</p>
-                            <p className="text-xs text-muted-foreground">{u.email}</p>
+                          <div className="min-w-0">
+                            <p className="font-medium text-foreground hover:underline">
+                              {u.full_name}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {u.email}
+                            </p>
                           </div>
-                        </div>
+                        </Link>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {dept?.name ?? <span className="italic text-muted-foreground/60">—</span>}
+                        {deptName ?? <span className="italic text-muted-foreground/60">—</span>}
                       </td>
                       <td className="px-4 py-3">
                         {normalizeRoles(u.roles).length ? (
@@ -444,18 +432,47 @@ export function UsersTab() {
         </div>
         {/* Footer count */}
         {!usersLoading && (
-          <div className="border-t border-border bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
-            {filtered.length} of {users.length} user{users.length !== 1 ? "s" : ""}
+          <div className="flex items-center justify-between gap-3 border-t border-border bg-muted/20 px-4 py-2">
+            <p className="text-xs text-muted-foreground">
+              Showing{" "}
+              <span className="font-semibold text-foreground">{users.length}</span>{" "}
+              of{" "}
+              <span className="font-semibold text-foreground">{total}</span>{" "}
+              user{total !== 1 ? "s" : ""}
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={!canPrev}
+                aria-label="Previous page"
+                title="Previous page"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-foreground transition hover:bg-muted disabled:opacity-60"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!canNext}
+                aria-label="Next page"
+                title="Next page"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-foreground transition hover:bg-muted disabled:opacity-60"
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
           </div>
         )}
       </div>
 
       {/* Modals */}
       {createOpen && (
-        <UserFormModal mode="create" departments={departments} onClose={() => setCreateOpen(false)} />
+        <UserFormModal mode="create" onClose={() => setCreateOpen(false)} />
       )}
       {editUser && (
-        <UserFormModal mode="edit" user={editUser} departments={departments} onClose={() => setEditUser(null)} />
+        <UserFormModal mode="edit" user={editUser} onClose={() => setEditUser(null)} />
       )}
       {deleteTarget && (
         <ConfirmDelete

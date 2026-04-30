@@ -1,16 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Users, Building2, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { Users, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UsersTab } from "@/components/hrm/users/UsersTab";
-import { DepartmentsTab } from "@/components/hrm/users/DepartmentsTab";
-import { RolesTab } from "@/components/hrm/users/RolesTab";
 
 const TABS = [
   { id: "users", label: "Users", icon: Users },
-  { id: "departments", label: "Departments", icon: Building2 },
-  { id: "roles", label: "Roles", icon: ShieldCheck },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -47,13 +44,21 @@ export default function UsersPage() {
             {tab.label}
           </button>
         ))}
+        <Link
+          href="/departments"
+          className={cn(
+            "flex items-center gap-2 rounded-lg px-4 py-1.5 text-sm font-medium transition-all duration-150",
+            "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Building2 className="h-4 w-4 shrink-0" />
+          Departments
+        </Link>
       </div>
 
       {/* Tab content */}
       <div>
         {activeTab === "users" && <UsersTab />}
-        {activeTab === "departments" && <DepartmentsTab />}
-        {activeTab === "roles" && <RolesTab />}
       </div>
     </div>
   );

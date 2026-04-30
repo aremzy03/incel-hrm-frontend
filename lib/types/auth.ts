@@ -51,6 +51,8 @@ export interface Department {
   description: string;
   /** Backend may return UUID string or nested user object */
   line_manager: string | UserMinimal | null;
+  /** Present on list endpoint (GET /departments/) */
+  members_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -236,6 +238,19 @@ export interface RegisterRequest {
 
 export interface AuthResponse {
   user: User;
+}
+
+// ─── Password management ─────────────────────────────────────────────────────
+
+export interface PasswordChangePayload {
+  current_password: string;
+  new_password: string;
+  new_password_confirm: string;
+}
+
+export interface PasswordResetPayload {
+  new_password: string;
+  new_password_confirm: string;
 }
 
 // ─── Paginated response ──────────────────────────────────────────────────────

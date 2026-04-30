@@ -1,15 +1,57 @@
+function toErrorMessage(data: unknown): string | undefined {
+  if (!data) return undefined;
+  if (typeof data === "string") return data;
+  if (typeof data === "number" || typeof data === "boolean") return String(data);
+
+  if (Array.isArray(data)) {
+    const parts = data
+      .map((v) => toErrorMessage(v))
+      .filter((v): v is string => !!v);
+    return parts.length ? parts.join("\n") : undefined;
+  }
+
+  if (typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+
+    // Common API patterns
+    const directKeys = ["detail", "message", "error", "errors"] as const;
+    for (const k of directKeys) {
+      if (k in obj) {
+        const msg = toErrorMessage(obj[k]);
+        if (msg) return msg;
+      }
+    }
+
+    // DRF / validation error objects: { field: ["msg"], other_field: ["msg"] }
+    const entries = Object.entries(obj);
+    if (!entries.length) return undefined;
+
+    const lines: string[] = [];
+    for (const [key, value] of entries) {
+      const msg = toErrorMessage(value);
+      if (!msg) continue;
+      const compact = msg.replace(/\n+/g, "; ");
+      lines.push(`${key}: ${compact}`);
+    }
+    if (lines.length) return lines.join("\n");
+
+    // Last resort: render the raw payload
+    try {
+      return JSON.stringify(obj);
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
+}
+
 export class ApiError extends Error {
   status: number;
   data: unknown;
 
   constructor(status: number, data: unknown) {
-    const detail =
-      typeof (data as any)?.detail === "string"
-        ? ((data as any).detail as string)
-        : typeof data === "string"
-          ? data
-          : undefined;
-    const message = detail || "An error occurred";
+    const message = toErrorMessage(data) || "An error occurred";
     super(message);
     this.name = "ApiError";
     this.status = status;

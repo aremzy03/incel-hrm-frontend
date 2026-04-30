@@ -19,9 +19,24 @@ const USERS_KEY = ["users"];
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export function useUsers() {
+  return useUsersPage({ page: 1 });
+}
+
+export function useUsersPage({
+  page,
+  search,
+}: {
+  page: number;
+  search?: string;
+}) {
+  const qs = new URLSearchParams();
+  if (search) qs.set("search", search);
+  // DRF PageNumberPagination defaults to page 1 if omitted.
+  if (page > 1) qs.set("page", String(page));
+
   return useQuery<PaginatedResponse<User>>({
-    queryKey: USERS_KEY,
-    queryFn: () => apiGet<PaginatedResponse<User>>("users/"),
+    queryKey: [...USERS_KEY, "page", page, "search", search ?? ""],
+    queryFn: () => apiGet<PaginatedResponse<User>>(`users/?${qs.toString()}`),
   });
 }
 

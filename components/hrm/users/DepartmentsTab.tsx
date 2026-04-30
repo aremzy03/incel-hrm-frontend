@@ -2,19 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Pencil, Trash2, UserCheck, UserX, Users, ExternalLink } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Plus, Pencil, Trash2, Users, ExternalLink } from "lucide-react";
 import {
   useDepartments,
   useCreateDepartment,
   useUpdateDepartment,
   useDeleteDepartment,
-  useAssignLineManager,
-  useRemoveLineManager,
   useDepartmentMembers,
 } from "@/lib/api/departments";
-import { useUsers } from "@/lib/api/users";
-import type { Department, DepartmentPayload, User } from "@/lib/types/auth";
+import type { Department, DepartmentPayload } from "@/lib/types/auth";
 
 // ─── Overlay ──────────────────────────────────────────────────────────────────
 
@@ -94,117 +90,7 @@ function DeptFormModal({ mode, dept, onClose }: DeptFormModalProps) {
   );
 }
 
-// ─── Line Manager Modal ───────────────────────────────────────────────────────
-
-interface LineManagerModalProps {
-  dept: Department;
-  onClose: () => void;
-}
-
-function LineManagerModal({ dept, onClose }: LineManagerModalProps) {
-  const { data: usersData } = useUsers();
-  const assign = useAssignLineManager(dept.id);
-  const remove = useRemoveLineManager(dept.id);
-
-  const deptUsers = (usersData?.results ?? []).filter(
-    (u) => getUserDeptId(u.department) === dept.id
-  );
-  const [selected, setSelected] = useState(getLineManagerId(dept.line_manager) ?? "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleAssign(e: React.FormEvent) {
-    e.preventDefault();
-    if (!selected) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await assign.mutateAsync({ user_id: selected });
-      onClose();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to assign.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleRemove() {
-    setBusy(true);
-    setError(null);
-    try {
-      await remove.mutateAsync();
-      onClose();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to remove.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const fieldCls =
-    "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition";
-
-  return (
-    <Overlay onClose={onClose}>
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl">
-        <h2 className="mb-1 text-lg font-semibold text-foreground">Line Manager</h2>
-        <p className="mb-5 text-xs text-muted-foreground">{dept.name}</p>
-        {error && (
-          <p className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
-        )}
-        <form onSubmit={handleAssign} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">Select user in this department</label>
-            <select className={fieldCls} value={selected} onChange={(e) => setSelected(e.target.value)}>
-              <option value="">— Choose user —</option>
-              {deptUsers.map((u) => (
-                <option key={u.id} value={u.id}>{u.full_name}</option>
-              ))}
-            </select>
-            {deptUsers.length === 0 && (
-              <p className="mt-1 text-xs text-muted-foreground">No users in this department yet.</p>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button type="submit" disabled={busy || !selected} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60">
-              {busy && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />}
-              <UserCheck className="h-4 w-4" /> Assign
-            </button>
-            {getLineManagerId(dept.line_manager) && (
-              <button type="button" onClick={handleRemove} disabled={busy} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/10">
-                <UserX className="h-4 w-4" /> Remove
-              </button>
-            )}
-          </div>
-        </form>
-        <button onClick={onClose} className="mt-3 w-full rounded-lg border border-border py-2 text-sm font-medium transition hover:bg-muted">Close</button>
-      </div>
-    </Overlay>
-  );
-}
-
-// ─── Helpers: normalize backend shapes ────────────────────────────────────────
-
-function getLineManagerId(lm: Department["line_manager"]): string | null {
-  if (!lm) return null;
-  return typeof lm === "string" ? lm : lm.id;
-}
-
-function getLineManagerDisplay(
-  lm: Department["line_manager"],
-  users: { id: string; full_name: string }[]
-): string | null {
-  if (!lm) return null;
-  if (typeof lm === "object") {
-    return `${lm.first_name} ${lm.last_name}`.trim() || lm.email;
-  }
-  return users.find((u) => u.id === lm)?.full_name ?? lm;
-}
-
-function getUserDeptId(dept: string | { id: string } | null): string | null {
-  if (!dept) return null;
-  return typeof dept === "string" ? dept : dept?.id ?? null;
-}
+// (Removed line-manager assignment UI here to keep /departments free of /users requests.)
 
 // ─── Department Members Modal ─────────────────────────────────────────────────
 
@@ -276,21 +162,14 @@ function ConfirmDelete({ name, onConfirm, onClose }: { name: string; onConfirm: 
 
 export function DepartmentsTab() {
   const { data: deptsData, isLoading } = useDepartments();
-  const { data: usersData } = useUsers();
   const deleteDept = useDeleteDepartment();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editDept, setEditDept] = useState<Department | null>(null);
-  const [managerDept, setManagerDept] = useState<Department | null>(null);
   const [membersDept, setMembersDept] = useState<Department | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Department | null>(null);
 
   const departments = deptsData?.results ?? [];
-  const users = usersData?.results ?? [];
-
-  function getMemberCount(deptId: string) {
-    return users.filter((u) => getUserDeptId(u.department) === deptId).length;
-  }
 
   return (
     <div className="space-y-4">
@@ -339,15 +218,20 @@ export function DepartmentsTab() {
                       {d.description || <span className="italic opacity-50">—</span>}
                     </td>
                     <td className="px-4 py-3">
-                      {getLineManagerDisplay(d.line_manager, users) ? (
+                      {d.line_manager ? (
                         <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                          {getLineManagerDisplay(d.line_manager, users)}
+                          {typeof d.line_manager === "string"
+                            ? d.line_manager
+                            : `${d.line_manager.first_name} ${d.line_manager.last_name}`.trim() ||
+                              d.line_manager.email}
                         </span>
                       ) : (
                         <span className="text-xs italic text-muted-foreground/60">None</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{getMemberCount(d.id)}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {typeof d.members_count === "number" ? d.members_count : "—"}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <Link href={`/departments/${d.id}`} title="View department" className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground">
@@ -355,9 +239,6 @@ export function DepartmentsTab() {
                         </Link>
                         <button onClick={() => setMembersDept(d)} title="View members" className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground">
                           <Users className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => setManagerDept(d)} title="Manage line manager" className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground">
-                          <UserCheck className="h-4 w-4" />
                         </button>
                         <button onClick={() => setEditDept(d)} title="Edit" className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground">
                           <Pencil className="h-4 w-4" />
@@ -378,7 +259,6 @@ export function DepartmentsTab() {
       {/* Modals */}
       {createOpen && <DeptFormModal mode="create" onClose={() => setCreateOpen(false)} />}
       {editDept && <DeptFormModal mode="edit" dept={editDept} onClose={() => setEditDept(null)} />}
-      {managerDept && <LineManagerModal dept={managerDept} onClose={() => setManagerDept(null)} />}
       {membersDept && <DepartmentMembersModal dept={membersDept} onClose={() => setMembersDept(null)} />}
       {deleteTarget && (
         <ConfirmDelete
