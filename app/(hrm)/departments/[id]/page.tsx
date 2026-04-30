@@ -3,11 +3,12 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Building2,
   Loader2,
+  Plus,
   Search,
   Shield,
   Trash2,
@@ -21,7 +22,7 @@ import {
   useDepartmentDetail,
   useRemoveLineManager,
 } from "@/lib/api/departments";
-import { useBulkAddMembersToUnit } from "@/lib/api/units";
+import { useBulkAddMembersToUnit, useCreateUnit, useDeleteUnit } from "@/lib/api/units";
 import { BulkResultPanel } from "@/components/hrm/users/BulkResultPanel";
 import { BulkUserPicker } from "@/components/hrm/users/BulkUserPicker";
 import { Pagination } from "@/components/hrm/ui/Pagination";
@@ -76,11 +77,14 @@ function normalizeUsers(
 export default function DepartmentDetailPage() {
   const params = useParams();
   const id = params.id as string;
+  const qc = useQueryClient();
   const { data, isLoading, error } = useDepartmentDetail(id);
 
   const bulkAddToDepartment = useBulkAddDepartmentMembers(id);
   const bulkRemoveFromDepartment = useBulkRemoveDepartmentMembers(id);
   const bulkAddMembersToUnit = useBulkAddMembersToUnit();
+  const createUnit = useCreateUnit();
+  const deleteUnit = useDeleteUnit();
   const assignLineManager = useAssignLineManager(id);
   const removeLineManager = useRemoveLineManager(id);
 
@@ -113,6 +117,15 @@ export default function DepartmentDetailPage() {
   const [lineManagerUserId, setLineManagerUserId] = useState("");
   const [lineManagerError, setLineManagerError] = useState<string | null>(null);
 
+  // Unit create/delete controls (Units tab)
+  const [unitCreateOpen, setUnitCreateOpen] = useState(false);
+  const [unitCreateName, setUnitCreateName] = useState("");
+  const [unitCreateError, setUnitCreateError] = useState<string | null>(null);
+  const [unitDeleteTarget, setUnitDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
   // Pull a larger set of users for the add-to-department picker.
   // (Backend typically supports `page_size`; if not, it will just return the default page.)
   const { data: allUsersRaw } = useQuery({
@@ -127,6 +140,8 @@ export default function DepartmentDetailPage() {
     bulkAddToDepartment.isPending ||
     bulkRemoveFromDepartment.isPending ||
     bulkAddMembersToUnit.isPending ||
+    createUnit.isPending ||
+    deleteUnit.isPending ||
     assignLineManager.isPending ||
     removeLineManager.isPending;
 
@@ -275,6 +290,31 @@ export default function DepartmentDetailPage() {
       setLineManagerError(
         e instanceof Error ? e.message : "Failed to update line manager."
       );
+    }
+  }
+
+  async function handleCreateUnit() {
+    setUnitCreateError(null);
+    const name = unitCreateName.trim();
+    if (!name) return;
+    try {
+      await createUnit.mutateAsync({ name, department_id: id });
+      await qc.invalidateQueries({ queryKey: ["department-detail", id] });
+      setUnitCreateOpen(false);
+      setUnitCreateName("");
+    } catch (e: unknown) {
+      setUnitCreateError(e instanceof Error ? e.message : "Failed to create unit.");
+    }
+  }
+
+  async function handleConfirmDeleteUnit() {
+    if (!unitDeleteTarget) return;
+    try {
+      await deleteUnit.mutateAsync(unitDeleteTarget.id);
+      await qc.invalidateQueries({ queryKey: ["department-detail", id] });
+      setUnitDeleteTarget(null);
+    } catch {
+      // keep minimal; deletion failures can be retried
     }
   }
 
@@ -529,6 +569,25 @@ export default function DepartmentDetailPage() {
 
             {tab === "units" && (
               <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm text-muted-foreground">
+                    Create and manage units under this department.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUnitCreateError(null);
+                      setUnitCreateName("");
+                      setUnitCreateOpen(true);
+                    }}
+                    disabled={pendingAny}
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create unit
+                  </button>
+                </div>
+
                 {!units.length ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">
                     No units in this department.
@@ -552,6 +611,19 @@ export default function DepartmentDetailPage() {
                               {u.members?.length ?? 0} member
                               {(u.members?.length ?? 0) !== 1 ? "s" : ""}
                             </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setUnitDeleteTarget({ id: u.id, name: u.name })}
+                              disabled={pendingAny}
+                              title="Delete unit"
+                              aria-label={`Delete unit ${u.name}`}
+                              className="inline-flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive transition hover:bg-destructive/15 disabled:opacity-60"
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden />
+                              Delete
+                            </button>
                           </div>
                         </div>
                       </li>
@@ -835,6 +907,90 @@ export default function DepartmentDetailPage() {
                   Save
                 </button>
               </div>
+            </div>
+          </div>
+        </Overlay>
+      )}
+
+      {/* Create unit modal */}
+      {unitCreateOpen && (
+        <Overlay onClose={() => setUnitCreateOpen(false)}>
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="mb-1 text-lg font-semibold text-foreground">Create unit</h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Add a new unit under <span className="font-medium text-foreground">{department.name}</span>.
+            </p>
+
+            {unitCreateError && (
+              <p className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {unitCreateError}
+              </p>
+            )}
+
+            <div className="space-y-3">
+              <label className="block text-xs font-medium text-muted-foreground">
+                Unit name
+              </label>
+              <input
+                value={unitCreateName}
+                onChange={(e) => setUnitCreateName(e.target.value)}
+                disabled={pendingAny}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                placeholder="e.g. Engineering"
+              />
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setUnitCreateOpen(false)}
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateUnit}
+                  disabled={pendingAny || !unitCreateName.trim()}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          </div>
+        </Overlay>
+      )}
+
+      {/* Delete unit confirm */}
+      {unitDeleteTarget && (
+        <Overlay onClose={() => setUnitDeleteTarget(null)}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+              <Trash2 className="h-5 w-5 text-destructive" />
+            </div>
+            <h2 className="mt-3 text-base font-semibold text-foreground">
+              Delete unit?
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{unitDeleteTarget.name}</span>{" "}
+              will be permanently removed.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setUnitDeleteTarget(null)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteUnit}
+                disabled={pendingAny}
+                className="rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </Overlay>

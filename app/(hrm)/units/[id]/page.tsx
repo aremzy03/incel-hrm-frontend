@@ -13,7 +13,6 @@ import {
   useRemoveUnitSupervisor,
   useUpdateUnit,
 } from "@/lib/api/units";
-import { useDepartmentMembers } from "@/lib/api/departments";
 import {
   useBulkAddTeamMembers,
   useClearTeamLead,
@@ -83,7 +82,6 @@ export default function UnitDetailPage() {
   const { user } = useAuth();
 
   const deptId = data?.department?.id ?? "";
-  const { data: deptMembers = [] } = useDepartmentMembers(deptId);
   const { data: departmentUnits = [] } = useUnits(deptId);
 
   const bulkAddMembersToUnit = useBulkAddMembersToUnit();
@@ -183,12 +181,20 @@ export default function UnitDetailPage() {
   }, [data?.members, membersSearch, membersTeamFilter, userTeamById]);
 
   const supervisorOptions = useMemo(() => {
-    return deptMembers.slice().sort((a, b) => {
+    const base = (data?.members ?? []).slice();
+    const already = new Set(base.map((m) => m.id));
+    // Keep currently assigned supervisor selectable even if API omits them from unit members.
+    const currentSupervisor = data?.supervisor;
+    if (currentSupervisor && !already.has(currentSupervisor.id)) {
+      base.unshift(currentSupervisor);
+    }
+    base.sort((a, b) => {
       const an = `${a.first_name} ${a.last_name}`.trim();
       const bn = `${b.first_name} ${b.last_name}`.trim();
       return an.localeCompare(bn);
     });
-  }, [deptMembers]);
+    return base;
+  }, [data?.members, data?.supervisor]);
 
   if (isLoading) {
     return (
