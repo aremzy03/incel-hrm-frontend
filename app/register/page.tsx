@@ -2,6 +2,7 @@
 
 import { useState, useId } from "react";
 import Link from "next/link";
+import { LoginLinkWithNext } from "@/components/auth/LoginLinkWithNext";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Eye, EyeOff, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -235,13 +236,10 @@ export default function RegisterPage() {
             Your request has been submitted. Your HR admin will review and activate
             your account. You&apos;ll receive a confirmation email shortly.
           </p>
-          <Link
-            href="/"
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
-          >
+          <LoginLinkWithNext className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
             Back to Sign In
             <ArrowRight className="h-4 w-4" />
-          </Link>
+          </LoginLinkWithNext>
         </div>
       </div>
     );
@@ -544,9 +542,9 @@ export default function RegisterPage() {
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/" className="font-medium text-primary hover:underline">
+            <LoginLinkWithNext className="font-medium text-primary hover:underline">
               Sign in
-            </Link>
+            </LoginLinkWithNext>
           </p>
         </div>
       </div>

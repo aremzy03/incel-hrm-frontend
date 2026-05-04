@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { getSafeReturnPath } from "./lib/safeReturnPath";
+
 const PUBLIC_ROUTES = ["/", "/register"];
 
 export function proxy(req: NextRequest) {
@@ -9,11 +11,17 @@ export function proxy(req: NextRequest) {
   const isPublic = PUBLIC_ROUTES.includes(pathname);
 
   if (!isPublic && !hasAccess) {
-    return NextResponse.redirect(new URL("/", req.url));
+    const login = new URL("/", req.url);
+    const intended = req.nextUrl.pathname + req.nextUrl.search;
+    if (intended.length <= 1500) {
+      login.searchParams.set("next", intended);
+    }
+    return NextResponse.redirect(login);
   }
 
   if (isPublic && hasAccess) {
-    return NextResponse.redirect(new URL("/leave", req.url));
+    const next = getSafeReturnPath(req.nextUrl.searchParams.get("next"));
+    return NextResponse.redirect(new URL(next, req.url));
   }
 
   return NextResponse.next();

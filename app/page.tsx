@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useId } from "react";
+import { Suspense, useState, useId } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { Eye, EyeOff, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { getSafeReturnPath } from "@/lib/safeReturnPath";
 import type { LoginRequest, AuthResponse } from "@/lib/types/auth";
 
 const fieldClass =
@@ -80,20 +81,44 @@ async function loginFn(payload: LoginRequest): Promise<AuthResponse> {
   return data;
 }
 
-export default function LoginPage() {
+function LoginFormFallback() {
+  return (
+    <div className="flex flex-1 items-center justify-center bg-background px-6 py-12">
+      <div className="flex w-full max-w-[360px] flex-col items-center gap-4">
+        <div className="mb-4 flex w-full items-center gap-2.5 lg:hidden">
+          <img src="/hrm-logo.png" alt="" className="h-12 w-12" />
+          <span className="font-serif font-semibold text-base text-foreground">
+            Incel Group
+          </span>
+        </div>
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+      </div>
+    </div>
+  );
+}
+
+function LoginForm() {
   const uid = useId();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const nextParam = searchParams.get("next");
+  const afterLoginPath = getSafeReturnPath(nextParam);
+  const registerHref =
+    nextParam && nextParam.length <= 1500
+      ? `/register?next=${encodeURIComponent(nextParam)}`
+      : "/register";
+
   const mutation = useMutation({
     mutationFn: loginFn,
     onSuccess: (data) => {
       login(data.user);
-      router.push("/leave");
+      router.replace(afterLoginPath);
     },
     onError: (err: Error) => {
       setError(err.message);
@@ -111,11 +136,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <BrandPanel />
-
-      <div className="flex flex-1 items-center justify-center bg-background px-6 py-12">
-        <div className="w-full max-w-[360px]">
+    <div className="flex flex-1 items-center justify-center bg-background px-6 py-12">
+      <div className="w-full max-w-[360px]">
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
             <img
               src="/hrm-logo.png"
@@ -219,14 +241,24 @@ export default function LoginPage() {
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
             <Link
-              href="/register"
+              href={registerHref}
               className="font-medium text-primary hover:underline"
             >
               Create account
             </Link>
           </p>
         </div>
-      </div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <div className="flex min-h-screen">
+      <BrandPanel />
+      <Suspense fallback={<LoginFormFallback />}>
+        <LoginForm />
+      </Suspense>
     </div>
   );
 }
