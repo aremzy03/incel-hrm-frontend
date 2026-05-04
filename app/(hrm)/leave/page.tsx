@@ -62,7 +62,7 @@ export default function LeaveDashboardPage() {
   });
 
   const { data: requests, isLoading: requestsLoading } = useQuery({
-    queryKey: ["leave-requests-recent"],
+    queryKey: ["leave-requests"],
     queryFn: () =>
       apiGet<PaginatedResponse<LeaveRequest> | LeaveRequest[]>("leave-requests"),
   });

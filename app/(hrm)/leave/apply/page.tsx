@@ -218,7 +218,7 @@ export default function ApplyLeavePage() {
 
   const currentYear = new Date().getFullYear();
   const { data: myRequestsRaw } = useQuery({
-    queryKey: ["my-leave-requests"],
+    queryKey: ["leave-requests"],
     queryFn: () =>
       apiGet<PaginatedResponse<LeaveRequest> | LeaveRequest[]>("leave-requests"),
   });
@@ -307,8 +307,7 @@ export default function ApplyLeavePage() {
     },
     onSuccess: (created) => {
       setApiError(null);
-      queryClient.invalidateQueries({ queryKey: ["leave-requests-recent"] });
-      queryClient.invalidateQueries({ queryKey: ["my-leave-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
       const id =
         (created as { id?: string }).id ?? (created as { pk?: string }).pk;
       if (id) {
@@ -335,8 +334,7 @@ export default function ApplyLeavePage() {
     onSuccess: () => {
       setSubmitted(true);
       setApiError(null);
-      queryClient.invalidateQueries({ queryKey: ["leave-requests-recent"] });
-      queryClient.invalidateQueries({ queryKey: ["my-leave-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
       queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
     },
     onError: (err) => {

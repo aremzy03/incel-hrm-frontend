@@ -88,7 +88,7 @@ function ConfirmModal({
   }, [onClose]);
 
   const isApprove = modal.action === "approve";
-  const Verb = isApprove ? "Approve" : "Reject";
+  const confirmTitle = isApprove ? "Confirm Approval" : "Confirm Rejection";
   const verb = isApprove ? "approve" : "reject";
   const employeeName = `${modal.record.employee.first_name} ${modal.record.employee.last_name}`;
 
@@ -118,7 +118,7 @@ function ConfirmModal({
           id={`${dialogId}-title`}
           className="text-lg font-semibold text-foreground"
         >
-          Confirm {Verb}al
+          {confirmTitle}
         </h2>
 
         <p className="mt-2 text-sm text-muted-foreground">
@@ -180,7 +180,7 @@ function ConfirmModal({
             )}
           >
             {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Confirm {Verb}al
+            {confirmTitle}
           </button>
         </div>
       </div>
@@ -193,7 +193,7 @@ export default function AdminApprovalsPage() {
   const { user } = useAuth();
 
   const { data: requestsRaw, isLoading } = useQuery({
-    queryKey: ["admin-leave-requests"],
+    queryKey: ["leave-requests"],
     queryFn: () =>
       apiGet<PaginatedResponse<LeaveRequest> | LeaveRequest[]>("leave-requests"),
   });
@@ -246,7 +246,7 @@ export default function AdminApprovalsPage() {
         comment: comment || undefined,
       }),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["admin-leave-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
       const rec = modal?.record;
       if (rec) {
         showToast(
@@ -266,7 +266,7 @@ export default function AdminApprovalsPage() {
     mutationFn: ({ id, comment }: { id: string; comment: string }) =>
       apiPost<LeaveRequest>(`leave-requests/${id}/reject`, { comment }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-leave-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
       const rec = modal?.record;
       if (rec) {
         showToast(

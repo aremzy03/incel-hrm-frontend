@@ -2,13 +2,14 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, X, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, X, Loader2, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/hrm/ui/StatusBadge";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
 import { DataTable } from "@/components/hrm/ui/DataTable";
-import { apiGet, apiPost } from "@/lib/api-client";
+import { apiGet } from "@/lib/api-client";
+import { useAuth } from "@/contexts/AuthContext";
 import { LEAVE_STATUS_DISPLAY } from "@/lib/types/leave";
 import type {
   LeaveRequest,
@@ -31,14 +32,6 @@ const ALL_STATUSES: LeaveStatus[] = [
   "CANCELLED",
 ];
 
-/** Statuses from which the owner can cancel their leave request */
-const CANCELLABLE_BY_OWNER: LeaveStatus[] = [
-  "DRAFT",
-  "PENDING_TEAM_LEAD",
-  "PENDING_SUPERVISOR",
-  "PENDING_MANAGER",
-];
-
 const TABLE_COLUMNS = [
   { key: "type", label: "Leave Type" },
   { key: "start", label: "Start Date" },
@@ -46,18 +39,18 @@ const TABLE_COLUMNS = [
   { key: "days", label: "Days" },
   { key: "reason", label: "Reason" },
   { key: "status", label: "Status" },
-  { key: "action", label: "Actions" },
+  { key: "view", label: "View" },
 ];
 
 const selectClass =
   "rounded-lg border border-border bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
 export default function LeaveHistoryPage() {
-  const queryClient = useQueryClient();
+  const { user, isLoading: authLoading } = useAuth();
   const currentYear = new Date().getFullYear();
 
   const { data: requestsRaw, isLoading: requestsLoading } = useQuery({
-    queryKey: ["my-leave-requests"],
+    queryKey: ["leave-requests"],
     queryFn: () =>
       apiGet<PaginatedResponse<LeaveRequest> | LeaveRequest[]>("leave-requests"),
   });
@@ -70,9 +63,14 @@ export default function LeaveHistoryPage() {
       ),
   });
 
-  const records: LeaveRequest[] = Array.isArray(requestsRaw)
+  const allRequests: LeaveRequest[] = Array.isArray(requestsRaw)
     ? requestsRaw
     : requestsRaw?.results ?? [];
+
+  const records: LeaveRequest[] = useMemo(() => {
+    if (!user) return [];
+    return allRequests.filter((r) => r.employee.id === user.id);
+  }, [allRequests, user]);
 
   const balances: LeaveBalance[] = Array.isArray(balancesRaw)
     ? balancesRaw
@@ -81,7 +79,6 @@ export default function LeaveHistoryPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | string>("all");
   const [page, setPage] = useState(1);
-  const [cancelTarget, setCancelTarget] = useState<LeaveRequest | null>(null);
 
   const leaveTypeNames = useMemo(() => {
     const names = new Set(records.map((r) => r.leave_type.name));
@@ -103,16 +100,7 @@ export default function LeaveHistoryPage() {
     safePage * PAGE_SIZE
   );
 
-  const cancelMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiPost<LeaveRequest>(`leave-requests/${id}/cancel`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my-leave-requests"] });
-      setCancelTarget(null);
-    },
-  });
-
-  const isLoading = requestsLoading || balancesLoading;
+  const isLoading = authLoading || requestsLoading || balancesLoading;
 
   return (
     <>
@@ -249,18 +237,15 @@ export default function LeaveHistoryPage() {
                     </span>
                   ),
                   status: <StatusBadge status={row.status} />,
-                  action: CANCELLABLE_BY_OWNER.includes(
-                    row.status as LeaveStatus
-                  ) ? (
-                      <button
-                        onClick={() => setCancelTarget(row)}
-                        className="rounded-md border border-destructive px-2 py-1 text-xs text-destructive transition hover:bg-destructive/10"
-                      >
-                        Cancel
-                      </button>
-                    ) : (
-                      <span className="text-muted-foreground">&mdash;</span>
-                    ),
+                  view: (
+                    <Link
+                      href={`/leave/requests/${row.id}`}
+                      className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+                    >
+                      <Eye className="h-3.5 w-3.5" aria-hidden />
+                      View
+                    </Link>
+                  ),
                 }))}
               />
 
@@ -315,71 +300,6 @@ export default function LeaveHistoryPage() {
           </>
         )}
       </div>
-
-      {cancelTarget && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="cancel-dialog-title"
-        >
-          <div
-            className="absolute inset-0 bg-foreground/20 backdrop-blur-sm"
-            onClick={() => setCancelTarget(null)}
-            aria-hidden="true"
-          />
-
-          <div className="relative w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-md">
-            <button
-              onClick={() => setCancelTarget(null)}
-              className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground hover:bg-muted transition"
-              aria-label="Close dialog"
-            >
-              <X className="h-4 w-4" />
-            </button>
-
-            <h2
-              id="cancel-dialog-title"
-              className="text-base font-semibold text-foreground"
-            >
-              Cancel Leave Request
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Are you sure you want to cancel this leave request?
-            </p>
-
-            <div className="mt-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
-              <p className="font-medium text-foreground">
-                {cancelTarget.leave_type.name}
-              </p>
-              <p className="text-muted-foreground">
-                {cancelTarget.start_date} &mdash; {cancelTarget.end_date} &middot;{" "}
-                {cancelTarget.total_working_days} day
-                {cancelTarget.total_working_days !== 1 ? "s" : ""}
-              </p>
-            </div>
-
-            <div className="mt-5 flex justify-end gap-3">
-              <button
-                onClick={() => setCancelTarget(null)}
-                className="rounded-lg border border-border px-4 py-2 text-sm text-foreground transition hover:bg-muted"
-              >
-                Go Back
-              </button>
-              <button
-                onClick={() => cancelMutation.mutate(cancelTarget.id)}
-                disabled={cancelMutation.isPending}
-                className="flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition hover:opacity-90 disabled:opacity-50"
-              >
-                {cancelMutation.isPending && (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                )}
-                Confirm Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

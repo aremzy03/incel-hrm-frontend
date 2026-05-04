@@ -100,7 +100,7 @@ function ApproverConfirmModal({
   const dialogId = `leave-approver-${request.id}`;
   const [comment, setComment] = useState("");
   const isApprove = action === "approve";
-  const Verb = isApprove ? "Approve" : "Reject";
+  const confirmTitle = isApprove ? "Confirm Approval" : "Confirm Rejection";
 
   return (
     <div
@@ -128,7 +128,7 @@ function ApproverConfirmModal({
           id={`${dialogId}-title`}
           className="text-lg font-semibold text-foreground"
         >
-          Confirm {Verb}al
+          {confirmTitle}
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
           {isApprove
@@ -189,7 +189,7 @@ function ApproverConfirmModal({
             )}
           >
             {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Confirm {Verb}al
+            {confirmTitle}
           </button>
         </div>
       </div>
@@ -265,8 +265,7 @@ export default function LeaveRequestDetailPage({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leave-request", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-request-logs", id] });
-      queryClient.invalidateQueries({ queryKey: ["my-leave-requests"] });
-      queryClient.invalidateQueries({ queryKey: ["leave-requests-recent"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
       setEditForm(null);
       setEditError(null);
     },
@@ -312,7 +311,7 @@ export default function LeaveRequestDetailPage({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leave-request", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-request-logs", id] });
-      queryClient.invalidateQueries({ queryKey: ["admin-leave-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
       setApprovalModal(null);
       setEditError(null);
     },
@@ -327,7 +326,7 @@ export default function LeaveRequestDetailPage({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leave-request", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-request-logs", id] });
-      queryClient.invalidateQueries({ queryKey: ["admin-leave-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
       setApprovalModal(null);
       setEditError(null);
     },
@@ -341,7 +340,7 @@ export default function LeaveRequestDetailPage({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leave-request", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-request-logs", id] });
-      queryClient.invalidateQueries({ queryKey: ["my-leave-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
       setEditError(null);
     },
     onError: (err) => {
