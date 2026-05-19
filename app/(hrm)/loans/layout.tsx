@@ -8,76 +8,42 @@ import {
   FilePlus,
   FileText,
   CheckCircle,
-  CalendarDays,
-  CalendarRange,
-  Tags,
+  BarChart3,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-
-// ─── Nav config ───────────────────────────────────────────────────────────────
-
-type RoleName =
-  | "EMPLOYEE"
-  | "LINE_MANAGER"
-  | "TEAM_LEAD"
-  | "SUPERVISOR"
-  | "HR"
-  | "EXECUTIVE_DIRECTOR"
-  | "MANAGING_DIRECTOR";
+import { LOAN_APPROVER_ROLES } from "@/lib/rbac";
+import type { RoleName } from "@/lib/types/auth";
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
-  /** When set, the item is only visible to users that have at least one matching role. */
   allowedRoles?: RoleName[];
 }
 
-const HR_ROLES: RoleName[] = ["HR", "EXECUTIVE_DIRECTOR", "MANAGING_DIRECTOR"];
-
 const ALL_NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", href: "/leave", icon: LayoutDashboard },
-  { label: "Apply", href: "/leave/apply", icon: FilePlus },
-  { label: "Leave History", href: "/leave/history", icon: FileText },
+  { label: "Dashboard", href: "/loans", icon: LayoutDashboard },
+  { label: "Apply for Loan", href: "/loans/apply", icon: FilePlus },
+  { label: "My Loans", href: "/loans/history", icon: FileText },
   {
     label: "Approvals",
-    href: "/leave/admin",
+    href: "/loans/admin",
     icon: CheckCircle,
-    allowedRoles: [
-      "TEAM_LEAD",
-      "SUPERVISOR",
-      "LINE_MANAGER",
-      "HR",
-      "EXECUTIVE_DIRECTOR",
-      "MANAGING_DIRECTOR",
-    ],
-  },
-  { label: "Calendar", href: "/leave/calendar", icon: CalendarDays },
-  {
-    label: "Public Holidays",
-    href: "/leave/public-holidays",
-    icon: CalendarRange,
-    allowedRoles: HR_ROLES,
+    allowedRoles: [...LOAN_APPROVER_ROLES],
   },
   {
-    label: "Leave Types",
-    href: "/leave/types",
-    icon: Tags,
-    allowedRoles: HR_ROLES,
+    label: "Reports",
+    href: "/loans/reports",
+    icon: BarChart3,
+    allowedRoles: ["HR"],
   },
 ];
 
-// ─── Layout ───────────────────────────────────────────────────────────────────
-
-export default function LeaveLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function LoansLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();
@@ -91,14 +57,7 @@ export default function LeaveLayout({
   }, [user?.roles]);
 
   return (
-    /*
-     * h-full fills the parent <main> (flex-1, height = 100vh - 56px).
-     * This means <main> never scrolls for leave pages; instead the content
-     * column below handles its own overflow-y-auto. The sidebar then fills
-     * exactly the visible area without needing sticky/h-screen tricks.
-     */
     <div className="flex h-[calc(100vh-56px)] overflow-hidden bg-sidebar">
-      {/* ── Sidebar ─────────────────────────────────────────────────── */}
       <aside
         className={cn(
           "flex h-full shrink-0 flex-col",
@@ -107,7 +66,6 @@ export default function LeaveLayout({
           collapsed ? "w-14" : "w-56"
         )}
       >
-        {/* Header row — height matches top nav bar (h-14) */}
         <div
           className={cn(
             "flex h-14 shrink-0 items-center",
@@ -116,7 +74,7 @@ export default function LeaveLayout({
         >
           {!collapsed && (
             <span className="truncate text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Leave
+              Staff Loans
             </span>
           )}
           <button
@@ -133,7 +91,6 @@ export default function LeaveLayout({
           </button>
         </div>
 
-        {/* Primary CTA — mirrors “Quick Create” pattern */}
         <div
           className={cn(
             "shrink-0 px-2 pb-2",
@@ -144,7 +101,7 @@ export default function LeaveLayout({
             <Button
               nativeButton={false}
               render={
-                <Link href="/leave/apply" aria-label="Apply for leave" />
+                <Link href="/loans/apply" aria-label="Apply for loan" />
               }
               size="icon-lg"
               className="shrink-0 rounded-full"
@@ -154,25 +111,24 @@ export default function LeaveLayout({
           ) : (
             <Button
               nativeButton={false}
-              render={<Link href="/leave/apply" />}
+              render={<Link href="/loans/apply" />}
               size="lg"
               className="h-9 w-full gap-2 rounded-full px-3 text-sm font-medium shadow-sm"
             >
               <FilePlus className="size-4 shrink-0" />
-              Apply for leave
+              Apply for loan
             </Button>
           )}
         </div>
 
-        {/* Nav items */}
         <nav
           className="flex flex-col gap-0.5 px-2 py-2"
-          aria-label="Leave module navigation"
+          aria-label="Staff loans navigation"
         >
           {navItems.map((item) => {
             const isActive =
               pathname === item.href ||
-              (item.href !== "/leave" && pathname.startsWith(item.href));
+              (item.href !== "/loans" && pathname.startsWith(item.href));
 
             return (
               <Link
@@ -197,7 +153,6 @@ export default function LeaveLayout({
         </nav>
       </aside>
 
-      {/* Content column: hairline edge + light elevation */}
       <div className="min-w-0 flex-1 overflow-y-auto rounded-tl-2xl border-l border-t border-border bg-background shadow-sm">
         {children}
       </div>

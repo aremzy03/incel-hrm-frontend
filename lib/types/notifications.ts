@@ -2,7 +2,13 @@ export type NotificationType =
   | "LEAVE_SUBMITTED"
   | "LEAVE_ACTION_REQUIRED"
   | "LEAVE_APPROVED"
-  | "LEAVE_REJECTED";
+  | "LEAVE_REJECTED"
+  | "LOAN_SUBMITTED"
+  | "LOAN_APPROVED"
+  | "LOAN_REJECTED"
+  | "LOAN_DISBURSED"
+  | "LOAN_LIQUIDATED"
+  | "LOAN_CLOSED";
 
 export interface NotificationItem {
   notification_id: string;

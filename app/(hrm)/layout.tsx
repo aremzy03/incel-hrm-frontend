@@ -25,14 +25,22 @@ import { NotificationsBell } from "@/components/hrm/notifications/NotificationsB
 const BASE_MODULES = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, disabled: true },
   { label: "Leave Management", href: "/leave", icon: CalendarDays },
+  { label: "Staff Loans", href: "/loans", icon: DollarSign },
 ];
 
 const USERS_MODULE = { label: "Users", href: "/users", icon: Users };
 
-const soonModules = [
-  { label: "Staff Loans", icon: DollarSign },
-  { label: "Appraisals", icon: Star },
-];
+const soonModules = [{ label: "Appraisals", icon: Star }];
+
+function isNavItemActive(pathname: string, href: string): boolean {
+  if (href === "/leave") {
+    return pathname === "/leave" || pathname.startsWith("/leave/");
+  }
+  if (href === "/loans") {
+    return pathname === "/loans" || pathname.startsWith("/loans/");
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
@@ -82,7 +90,7 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
         {/* Mobile hamburger */}
         <button
           onClick={() => setMobileOpen((o) => !o)}
-          className="rounded-md p-1.5 text-sidebar-foreground transition hover:bg-sidebar-accent lg:hidden"
+          className="cursor-pointer rounded-md p-1.5 text-sidebar-foreground transition-colors duration-200 hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar lg:hidden"
           aria-label="Toggle navigation"
           aria-expanded={mobileOpen}
         >
@@ -123,11 +131,7 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
           aria-label="Main navigation"
         >
           {activeModules.map((item) => {
-            const isActive =
-              item.href === "/leave"
-                ? pathname === "/leave" || pathname.startsWith("/leave/")
-                : pathname === item.href ||
-                  pathname.startsWith(item.href + "/");
+            const isActive = isNavItemActive(pathname, item.href);
 
             if ("disabled" in item && item.disabled) {
               return (
@@ -146,9 +150,9 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition",
+                  "flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
                   isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
+                    ? "bg-background text-foreground shadow-sm ring-1 ring-border/90"
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 )}
               >
@@ -180,7 +184,7 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
           <button
             aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
             onClick={() => setDark((d) => !d)}
-            className="rounded-md p-1.5 text-sidebar-foreground transition hover:bg-sidebar-accent"
+            className="cursor-pointer rounded-md p-1.5 text-sidebar-foreground transition-colors duration-200 hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
           >
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
@@ -195,7 +199,7 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-2">
           <Link
             href="/profile"
-            className="flex items-center gap-2 rounded-lg transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
+            className="flex cursor-pointer items-center gap-2 rounded-lg transition-opacity duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
             aria-label="View profile"
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
@@ -213,7 +217,7 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
           <button
             aria-label="Logout"
             onClick={() => logout()}
-            className="ml-1 rounded-md p-1.5 text-muted-foreground transition hover:bg-sidebar-accent"
+            className="ml-1 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors duration-200 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
           >
             <LogOut className="h-3.5 w-3.5" />
           </button>
@@ -225,11 +229,7 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
         <div className="shrink-0 border-b border-sidebar-border bg-sidebar px-4 py-2 lg:hidden">
           <nav className="space-y-0.5">
             {activeModules.map((item) => {
-              const isActive =
-                item.href === "/leave"
-                  ? pathname === "/leave" || pathname.startsWith("/leave/")
-                  : pathname === item.href ||
-                    pathname.startsWith(item.href + "/");
+              const isActive = isNavItemActive(pathname, item.href);
 
               if ("disabled" in item && item.disabled) {
                 return (
@@ -249,10 +249,10 @@ export default function HRMLayout({ children }: { children: React.ReactNode }) {
                   href={item.href}
                   onClick={() => setMobileOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition",
+                    "flex cursor-pointer items-center gap-3 rounded-full px-3 py-2 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
                     isActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent"
+                      ? "bg-background text-foreground shadow-sm ring-1 ring-border/90"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
                 >
                   <item.icon className="h-4 w-4 shrink-0" />

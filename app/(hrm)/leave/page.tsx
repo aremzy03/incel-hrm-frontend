@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/hrm/ui/PageHeader";
 import { StatCard } from "@/components/hrm/ui/StatCard";
 import { DataTable } from "@/components/hrm/ui/DataTable";
 import { StatusBadge } from "@/components/hrm/ui/StatusBadge";
+import { Button } from "@/components/ui/button";
 import { apiGet } from "@/lib/api-client";
 import type { LeaveBalance, LeaveRequest, PaginatedResponse } from "@/lib/types/leave";
 
@@ -104,7 +105,7 @@ export default function LeaveDashboardPage() {
     action: (
       <Link
         href={`/leave/requests/${row.id}`}
-        className="text-xs text-primary hover:underline"
+        className="cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors duration-200 hover:bg-muted hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         View
       </Link>
@@ -112,17 +113,19 @@ export default function LeaveDashboardPage() {
   }));
 
   return (
-    <div className="space-y-8 p-8">
+    <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader
         title="Leave Management"
         subtitle="Manage, request, and track leave across your organisation."
         action={
-          <Link
-            href="/leave/apply"
-            className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition hover:opacity-90"
+          <Button
+            nativeButton={false}
+            render={<Link href="/leave/apply" />}
+            size="lg"
+            className="rounded-full px-5 shadow-sm"
           >
             Apply for Leave
-          </Link>
+          </Button>
         }
       />
 
@@ -131,7 +134,7 @@ export default function LeaveDashboardPage() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <>
+        <section className="space-y-6 rounded-2xl border border-border/90 bg-card p-5 shadow-sm sm:p-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Annual Leave Balance"
@@ -164,19 +167,19 @@ export default function LeaveDashboardPage() {
             emptyMessage="No leave requests found."
             header={
               <div className="flex items-center justify-between px-6 py-4">
-                <h2 className="text-base font-semibold text-foreground">
+                <h2 className="text-base font-semibold tracking-tight text-foreground">
                   Recent Leave Requests
                 </h2>
                 <Link
                   href="/leave/requests"
-                  className="text-sm text-primary hover:underline"
+                  className="cursor-pointer rounded-full px-3 py-1.5 text-sm font-medium text-primary transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   View All
                 </Link>
               </div>
             }
           />
-        </>
+        </section>
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -184,7 +187,7 @@ export default function LeaveDashboardPage() {
           <Link
             key={link.href}
             href={link.href}
-            className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-card p-4 transition hover:shadow-md"
+            className="flex cursor-pointer items-center gap-3 rounded-xl border border-border/90 bg-card p-4 shadow-sm transition-colors duration-200 hover:border-border hover:shadow-md"
           >
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent">
               <link.icon className="h-5 w-5 text-primary" />

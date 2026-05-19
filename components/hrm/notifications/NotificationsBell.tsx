@@ -61,7 +61,7 @@ export function NotificationsBell() {
       <button
         aria-label="Notifications"
         onClick={() => setOpen(true)}
-        className="relative rounded-md p-2 text-sidebar-foreground transition hover:bg-sidebar-accent focus:outline-none focus:ring-2 focus:ring-ring"
+        className="relative cursor-pointer rounded-md p-2 text-sidebar-foreground transition-colors duration-200 hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
       >
         <Bell className="h-4 w-4" />
         {badge}

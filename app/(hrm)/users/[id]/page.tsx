@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2, User2 } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
+import { PersonnelForm } from "@/components/hrm/personnel/PersonnelForm";
 import { useUser } from "@/lib/api/users";
 import { useResetUserPassword } from "@/lib/api/password";
 import { cn } from "@/lib/utils";
@@ -12,19 +13,11 @@ import { cn } from "@/lib/utils";
 const fieldClass =
   "w-full rounded-lg border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition";
 
-function getDepartmentName(
-  dept: string | { id: string; name: string } | null | undefined
-): string | null {
-  if (!dept) return null;
-  if (typeof dept === "string") return dept;
-  return dept.name ?? null;
-}
-
 export default function UserDetailPage() {
   const params = useParams();
   const id = params.id as string;
 
-  const { data: user, isLoading, error } = useUser(id);
+  const { data: user, isLoading: userLoading } = useUser(id);
   const resetPassword = useResetUserPassword(id);
 
   const [form, setForm] = useState({
@@ -35,7 +28,10 @@ export default function UserDetailPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [showPwd, setShowPwd] = useState({ next: false, confirm: false });
 
-  const deptName = useMemo(() => getDepartmentName(user?.department), [user?.department]);
+  const rolesLabel = useMemo(
+    () => (user?.roles?.length ? user.roles.join(", ") : null),
+    [user?.roles]
+  );
 
   async function handleReset(e: React.FormEvent) {
     e.preventDefault();
@@ -64,94 +60,60 @@ export default function UserDetailPage() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (error || !user) {
+  if (!id) {
     return (
       <div className="p-6">
         <PageHeader title="User details" />
-        <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-destructive">
-          {error instanceof Error ? error.message : "Failed to load user."}
-        </div>
-        <div className="mt-4">
-          <Link
-            href="/users"
-            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Users
-          </Link>
-        </div>
+        <p className="text-destructive">Invalid user.</p>
       </div>
     );
   }
 
   return (
     <div className="p-6">
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-6 space-y-1">
         <Link
           href="/users"
-          className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back
+          Back to users
         </Link>
-        <PageHeader title="User details" />
+        <nav className="text-sm text-muted-foreground" aria-label="Breadcrumb">
+          <Link href="/users" className="hover:text-foreground">
+            Users
+          </Link>
+          <span className="mx-2">/</span>
+          <span className="text-foreground">Staff detail</span>
+        </nav>
       </div>
 
-      <div className="mx-auto max-w-2xl space-y-6">
-        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <User2 className="h-6 w-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-semibold text-foreground">{user.full_name}</h2>
-              <p className="text-sm text-muted-foreground">{user.email}</p>
-
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border border-border bg-muted/20 p-3">
-                  <p className="text-xs text-muted-foreground">Department</p>
-                  <p className="mt-1 text-sm font-medium text-foreground">
-                    {deptName ?? "—"}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border bg-muted/20 p-3">
-                  <p className="text-xs text-muted-foreground">Status</p>
-                  <p
-                    className={cn(
-                      "mt-1 inline-flex w-fit rounded-full px-2 py-0.5 text-xs font-medium",
-                      user.is_active
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                        : "bg-muted text-muted-foreground"
-                    )}
-                  >
-                    {user.is_active ? "Active" : "Inactive"}
-                  </p>
-                </div>
-              </div>
-
-              {user.roles?.length ? (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {user.roles.map((r) => (
-                    <span
-                      key={r}
-                      className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
-                    >
-                      {r}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+      <div className="mx-auto max-w-6xl space-y-6">
+        {userLoading ? (
+          <div className="flex min-h-[12vh] items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        </div>
+        ) : user ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-sm">
+            <span
+              className={cn(
+                "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+                user.is_active
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              {user.is_active ? "Active" : "Inactive"}
+            </span>
+            {rolesLabel ? (
+              <span className="text-muted-foreground">
+                Roles: <span className="font-medium text-foreground">{rolesLabel}</span>
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        <PersonnelForm userId={id} />
 
         <form
           onSubmit={handleReset}
@@ -254,4 +216,3 @@ export default function UserDetailPage() {
     </div>
   );
 }
-

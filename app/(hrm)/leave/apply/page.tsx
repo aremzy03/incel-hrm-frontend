@@ -203,9 +203,8 @@ export default function ApplyLeavePage() {
   }, []);
 
   const minEndDate = useMemo(() => {
-    const base = startDate ? new Date(startDate + "T00:00:00") : new Date(minStartDate + "T00:00:00");
-    base.setDate(base.getDate() + 1);
-    return toYmd(base);
+    if (startDate) return startDate;
+    return minStartDate;
   }, [minStartDate, startDate]);
 
   const deptId =
@@ -507,12 +506,8 @@ export default function ApplyLeavePage() {
                     value={startDate}
                     onChange={(next) => {
                       setStartDate(next);
-                      if (next) {
-                        const nextMinEnd = toYmd(new Date(next + "T00:00:00"));
-                        const d = new Date(nextMinEnd + "T00:00:00");
-                        d.setDate(d.getDate() + 1);
-                        const requiredEnd = toYmd(d);
-                        if (!endDate || endDate < requiredEnd) setEndDate(requiredEnd);
+                      if (next && endDate && endDate < next) {
+                        setEndDate(next);
                       }
                     }}
                     holidayNameByDate={holidayNameByDate}
