@@ -9,10 +9,29 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!;
 
+function isEventStreamRequest(req: NextRequest, targetPath: string): boolean {
+  const accept = req.headers.get("accept") ?? "";
+  if (accept.includes("text/event-stream")) return true;
+  const normalized = targetPath.replace(/\/+$/, "");
+  return normalized === "notifications/stream";
+}
+
+function eventStreamResponse(upstream: Response): Response {
+  const headers = new Headers();
+  headers.set("Content-Type", "text/event-stream");
+  headers.set("Cache-Control", "no-cache, no-transform");
+  headers.set("Connection", "keep-alive");
+
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers,
+  });
+}
+
 async function proxyRequest(
   req: NextRequest,
   params: { path: string[] }
-): Promise<NextResponse> {
+): Promise<NextResponse | Response> {
   const method = req.method;
   if (
     (method === "POST" || method === "PATCH" || method === "DELETE") &&
@@ -32,9 +51,16 @@ async function proxyRequest(
     ? `${API_URL.replace(/\/+$/, "")}/${targetPath.replace(/^\//, "")}${queryString}`
     : `${API_URL.replace(/\/+$/, "")}/${targetPath.replace(/^\//, "")}/`;
 
+  const wantsEventStream = isEventStreamRequest(req, targetPath);
+
   const headers: Record<string, string> = {};
   const contentType = req.headers.get("content-type");
   if (contentType) headers["Content-Type"] = contentType;
+  if (wantsEventStream) {
+    headers["Accept"] = "text/event-stream";
+    headers["Cache-Control"] = "no-cache";
+    headers["Connection"] = "keep-alive";
+  }
   if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
 
   const body =
@@ -71,6 +97,19 @@ async function proxyRequest(
   }
 
   const ct = res.headers.get("content-type") ?? "";
+  if (
+    (wantsEventStream || ct.includes("text/event-stream")) &&
+    res.body
+  ) {
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return new Response(text || "Failed to connect to event stream.", {
+        status: res.status,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+    return eventStreamResponse(res);
+  }
   if (ct.includes("application/json")) {
     const data = await res.json().catch(() => ({}));
     return NextResponse.json(data, { status: res.status });
