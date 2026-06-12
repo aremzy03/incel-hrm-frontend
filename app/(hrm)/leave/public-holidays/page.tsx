@@ -36,7 +36,7 @@ export default function LeavePublicHolidaysPage() {
 
   if (!canAccess) {
     return (
-      <div className="space-y-6 p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
         <nav className="flex items-center gap-2 text-sm" aria-label="Breadcrumb">
           <Link href="/leave" className="text-primary hover:underline">
             Leave Management
@@ -65,7 +65,7 @@ export default function LeavePublicHolidaysPage() {
   }
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="mx-auto max-w-7xl space-y-6">
       <nav className="flex items-center gap-2 text-sm" aria-label="Breadcrumb">
         <Link href="/leave" className="text-primary hover:underline">
           Leave Management

@@ -9,9 +9,7 @@ import { PersonnelForm } from "@/components/hrm/personnel/PersonnelForm";
 import { useUser } from "@/lib/api/users";
 import { useResetUserPassword } from "@/lib/api/password";
 import { cn } from "@/lib/utils";
-
-const fieldClass =
-  "w-full rounded-lg border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition";
+import { stitchCardClass, stitchFieldClass } from "@/lib/design/field-styles";
 
 export default function UserDetailPage() {
   const params = useParams();
@@ -30,7 +28,7 @@ export default function UserDetailPage() {
 
   const rolesLabel = useMemo(
     () => (user?.roles?.length ? user.roles.join(", ") : null),
-    [user?.roles]
+    [user]
   );
 
   async function handleReset(e: React.FormEvent) {
@@ -62,7 +60,7 @@ export default function UserDetailPage() {
 
   if (!id) {
     return (
-      <div className="p-6">
+      <div className="mx-auto max-w-7xl">
         <PageHeader title="User details" />
         <p className="text-destructive">Invalid user.</p>
       </div>
@@ -70,7 +68,7 @@ export default function UserDetailPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="mx-auto max-w-7xl">
       <div className="mb-6 space-y-1">
         <Link
           href="/users"
@@ -117,7 +115,7 @@ export default function UserDetailPage() {
 
         <form
           onSubmit={handleReset}
-          className="rounded-xl border border-border bg-card p-6 shadow-sm"
+          className={cn(stitchCardClass, "p-6")}
         >
           <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
             <KeyRound className="h-4 w-4" />
@@ -149,7 +147,7 @@ export default function UserDetailPage() {
               <div className="relative">
                 <input
                   id="reset-new-password"
-                  className={fieldClass}
+                  className={stitchFieldClass}
                   type={showPwd.next ? "text" : "password"}
                   autoComplete="new-password"
                   value={form.new_password}
@@ -176,7 +174,7 @@ export default function UserDetailPage() {
               <div className="relative">
                 <input
                   id="reset-new-password-confirm"
-                  className={fieldClass}
+                  className={stitchFieldClass}
                   type={showPwd.confirm ? "text" : "password"}
                   autoComplete="new-password"
                   value={form.new_password_confirm}

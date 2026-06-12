@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
+import { Breadcrumb } from "@/components/hrm/ui/Breadcrumb";
+import { stitchCardClass } from "@/lib/design/field-styles";
 import { apiGet } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { listPublicHolidays } from "@/lib/api/public-holidays";
@@ -273,14 +274,13 @@ export default function LeaveCalendarPage() {
 
   return (
     <>
-      <div className="space-y-6 p-8">
-        <nav className="flex items-center gap-2 text-sm" aria-label="Breadcrumb">
-          <Link href="/leave" className="text-primary hover:underline">
-            Leave Management
-          </Link>
-          <span className="text-muted-foreground">/</span>
-          <span className="font-medium text-foreground">Leave Calendar</span>
-        </nav>
+      <div className="mx-auto max-w-7xl space-y-6">
+        <Breadcrumb
+          items={[
+            { label: "Leave Management", href: "/leave" },
+            { label: "Leave Calendar" },
+          ]}
+        />
 
         <PageHeader
           title="Leave Calendar"
@@ -314,7 +314,7 @@ export default function LeaveCalendarPage() {
         <div className="flex items-center gap-4">
           <button
             onClick={prevMonth}
-            className="rounded-lg border border-border bg-card p-2 text-foreground transition hover:bg-muted"
+            className="rounded-xl border border-outline-variant bg-surface-container-lowest p-2 text-on-surface transition hover:bg-surface-container-low"
             aria-label="Previous month"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -326,7 +326,7 @@ export default function LeaveCalendarPage() {
 
           <button
             onClick={nextMonth}
-            className="rounded-lg border border-border bg-card p-2 text-foreground transition hover:bg-muted"
+            className="rounded-xl border border-outline-variant bg-surface-container-lowest p-2 text-on-surface transition hover:bg-surface-container-low"
             aria-label="Next month"
           >
             <ChevronRight className="h-4 w-4" />
@@ -339,7 +339,7 @@ export default function LeaveCalendarPage() {
               setMonth(today.getMonth());
               setSelectedDate(null);
             }}
-            className="ml-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground transition hover:bg-muted"
+            className="ml-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-sm text-on-surface-variant transition hover:bg-surface-container-low"
           >
             Today
           </button>
@@ -350,8 +350,8 @@ export default function LeaveCalendarPage() {
         </div>
 
         {/* Calendar grid */}
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-          <div className="grid grid-cols-7 border-b border-border">
+        <div className={cn(stitchCardClass, "overflow-hidden")}>
+          <div className="grid grid-cols-7 border-b border-outline-variant">
             {DOW_LABELS.map((day) => (
               <div
                 key={day}

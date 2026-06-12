@@ -7,7 +7,10 @@ import { ChevronLeft, ChevronRight, X, Loader2, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/hrm/ui/StatusBadge";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
+import { Breadcrumb } from "@/components/hrm/ui/Breadcrumb";
 import { DataTable } from "@/components/hrm/ui/DataTable";
+import { LeaveBalanceStrip } from "@/components/hrm/leave/LeaveBalanceStrip";
+import { stitchSelectClass } from "@/lib/design/field-styles";
 import { apiGet } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { LEAVE_STATUS_DISPLAY } from "@/lib/types/leave";
@@ -41,9 +44,6 @@ const TABLE_COLUMNS = [
   { key: "status", label: "Status" },
   { key: "view", label: "View" },
 ];
-
-const selectClass =
-  "rounded-lg border border-border bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
 export default function LeaveHistoryPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -104,14 +104,13 @@ export default function LeaveHistoryPage() {
 
   return (
     <>
-      <div className="space-y-8 p-8">
-        <nav className="flex items-center gap-2 text-sm" aria-label="Breadcrumb">
-          <Link href="/leave" className="text-primary hover:underline">
-            Leave Management
-          </Link>
-          <span className="text-muted-foreground">/</span>
-          <span className="font-medium text-foreground">My Leave History</span>
-        </nav>
+      <div className="mx-auto max-w-7xl space-y-8">
+        <Breadcrumb
+          items={[
+            { label: "Leave Management", href: "/leave" },
+            { label: "Leave History" },
+          ]}
+        />
 
         <PageHeader
           title="My Leave History"
@@ -124,55 +123,13 @@ export default function LeaveHistoryPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {balances.map((b) => {
-                const pct =
-                  b.allocated_days > 0
-                    ? (b.used_days / b.allocated_days) * 100
-                    : 0;
-                return (
-                  <div
-                    key={b.id}
-                    className="rounded-xl border border-border bg-card p-4 shadow-sm"
-                  >
-                    <p className="text-sm font-semibold text-foreground">
-                      {b.leave_type.name}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {b.allocated_days} days allocated
-                    </p>
-
-                    <div className="mt-3 flex items-end justify-between">
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-foreground">
-                          {b.used_days}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Used</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-primary">
-                          {b.remaining_days}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Remaining</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-2 rounded-full bg-primary transition-all"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <LeaveBalanceStrip balances={balances} />
 
             <div>
               <div className="mb-4 flex flex-wrap gap-3">
                 <select
                   value={statusFilter}
-                  className={selectClass}
+                  className={stitchSelectClass}
                   onChange={(e) => {
                     setStatusFilter(e.target.value as "all" | LeaveStatus);
                     setPage(1);
@@ -189,7 +146,7 @@ export default function LeaveHistoryPage() {
 
                 <select
                   value={typeFilter}
-                  className={selectClass}
+                  className={stitchSelectClass}
                   onChange={(e) => {
                     setTypeFilter(e.target.value);
                     setPage(1);

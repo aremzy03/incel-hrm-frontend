@@ -74,7 +74,7 @@ export default function LoansDashboardPage() {
   }));
 
   return (
-    <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <div className="mx-auto max-w-7xl space-y-8">
       <PageHeader
         title="Staff Loans"
         subtitle={
@@ -99,7 +99,7 @@ export default function LoansDashboardPage() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <section className="space-y-6 rounded-2xl border border-border/90 bg-card p-5 shadow-sm sm:p-6">
+        <section className="space-y-6 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 custom-shadow sm:p-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard
               label="Draft applications"

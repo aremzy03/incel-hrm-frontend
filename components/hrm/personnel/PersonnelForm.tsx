@@ -23,6 +23,7 @@ import {
 import type { PersonnelFormValues, UserPersonnel } from "@/lib/types/personnel";
 import type { PersonnelSectionId } from "@/lib/personnel/form";
 import { cn } from "@/lib/utils";
+import { stitchCardClass } from "@/lib/design/field-styles";
 
 interface PersonnelFormProps {
   userId: string;
@@ -57,7 +58,7 @@ function EditableSection({
 }) {
   return (
     <section
-      className="rounded-xl border border-border bg-card p-6 shadow-sm"
+      className={cn(stitchCardClass, "p-6")}
       aria-labelledby={`section-${sectionId}`}
     >
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -354,7 +355,7 @@ export function PersonnelForm({ userId, readOnly = false, onSaved }: PersonnelFo
         </span>
       </nav>
 
-      <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+      <div className={cn(stitchCardClass, "p-6")}>
         <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch">
           <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-center lg:items-start">
             <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-primary text-2xl font-semibold text-primary-foreground">

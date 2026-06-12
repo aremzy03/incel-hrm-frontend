@@ -12,22 +12,22 @@ const STYLE_MAP: Record<string, string> = {
   Approved: "bg-green-100 text-green-700",
   REJECTED: "bg-red-100 text-red-700",
   Rejected: "bg-red-100 text-red-700",
-  CANCELLED: "bg-muted text-muted-foreground",
-  Cancelled: "bg-muted text-muted-foreground",
-  DRAFT: "bg-secondary text-secondary-foreground",
-  Draft: "bg-secondary text-secondary-foreground",
-  PENDING_TEAM_LEAD: "bg-yellow-100 text-yellow-700",
-  PENDING_SUPERVISOR: "bg-yellow-100 text-yellow-700",
-  PENDING_MANAGER: "bg-yellow-100 text-yellow-700",
-  PENDING_HR: "bg-yellow-100 text-yellow-700",
-  PENDING_ED: "bg-yellow-100 text-yellow-700",
+  CANCELLED: "bg-surface-container-high text-on-surface-variant",
+  Cancelled: "bg-surface-container-high text-on-surface-variant",
+  DRAFT: "bg-secondary-container text-on-secondary-container",
+  Draft: "bg-secondary-container text-on-secondary-container",
+  PENDING_TEAM_LEAD: "bg-amber-100 text-amber-700",
+  PENDING_SUPERVISOR: "bg-amber-100 text-amber-700",
+  PENDING_MANAGER: "bg-amber-100 text-amber-700",
+  PENDING_HR: "bg-amber-100 text-amber-700",
+  PENDING_ED: "bg-amber-100 text-amber-700",
 };
 
 function getStatusStyle(status: string): string {
   if (STYLE_MAP[status]) return STYLE_MAP[status];
   if (status.startsWith("Pending") || status.startsWith("PENDING"))
-    return "bg-yellow-100 text-yellow-700";
-  return "bg-muted text-muted-foreground";
+    return "bg-amber-100 text-amber-700";
+  return "bg-surface-container-high text-on-surface-variant";
 }
 
 function getDisplayLabel(status: string): string {
@@ -40,7 +40,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium",
+        "inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase",
         getStatusStyle(status),
         className
       )}

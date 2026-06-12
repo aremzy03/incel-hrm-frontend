@@ -328,7 +328,7 @@ export default function DepartmentDetailPage() {
 
   if (error || !data || !department) {
     return (
-      <div className="p-6">
+      <div className="mx-auto max-w-7xl">
         <PageHeader title="Department" />
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-destructive">
           {error instanceof Error ? error.message : "Department not found."}
@@ -347,7 +347,7 @@ export default function DepartmentDetailPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="mx-auto max-w-7xl">
       <div className="mb-6 flex items-center gap-2">
         <Link
           href="/departments"

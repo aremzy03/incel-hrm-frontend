@@ -11,9 +11,13 @@ import { usePersonnel } from "@/lib/api/personnel";
 import { useAuth } from "@/contexts/AuthContext";
 import { getLoanApiErrorMessage } from "@/lib/loans/errors";
 import { ApiError } from "@/lib/api-client";
-
-const fieldClass =
-  "w-full rounded-lg border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+import {
+  stitchCardClass,
+  stitchFieldClass,
+  stitchSelectClass,
+  stitchTextareaClass,
+} from "@/lib/design/field-styles";
+import { cn } from "@/lib/utils";
 
 export default function ApplyForLoanPage() {
   const router = useRouter();
@@ -83,7 +87,7 @@ export default function ApplyForLoanPage() {
     createMutation.isPending || notConfirmed === true || isLoading;
 
   return (
-    <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <div className="mx-auto max-w-7xl space-y-8">
       <nav className="flex items-center gap-2 text-sm" aria-label="Breadcrumb">
         <Link href="/loans" className="text-primary hover:underline">
           Staff Loans
@@ -117,7 +121,7 @@ export default function ApplyForLoanPage() {
       ) : (
         <form
           onSubmit={handleSubmit}
-          className="max-w-xl space-y-5 rounded-2xl border border-border/90 bg-card p-6 shadow-sm"
+          className={cn(stitchCardClass, "max-w-xl space-y-5 p-6")}
         >
           <div>
             <label htmlFor="loan-type" className="mb-1.5 block text-sm font-medium">
@@ -127,7 +131,7 @@ export default function ApplyForLoanPage() {
               id="loan-type"
               value={loanTypeId}
               onChange={(e) => setLoanTypeId(e.target.value)}
-              className={fieldClass}
+              className={stitchSelectClass}
               required
             >
               <option value="">Select type…</option>
@@ -150,7 +154,7 @@ export default function ApplyForLoanPage() {
               step="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className={fieldClass}
+              className={stitchFieldClass}
               placeholder="e.g. 50000"
               required
             />
@@ -167,7 +171,7 @@ export default function ApplyForLoanPage() {
               max={12}
               value={tenureMonths}
               onChange={(e) => setTenureMonths(e.target.value)}
-              className={fieldClass}
+              className={stitchFieldClass}
               required
             />
             <p className="mt-1 text-xs text-muted-foreground">1–12 months</p>
@@ -182,7 +186,7 @@ export default function ApplyForLoanPage() {
               rows={4}
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
-              className={fieldClass}
+              className={stitchTextareaClass}
               placeholder="Describe why you need this loan…"
               required
             />

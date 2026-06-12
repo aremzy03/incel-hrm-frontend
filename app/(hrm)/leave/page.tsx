@@ -7,15 +7,15 @@ import {
   CheckCircle,
   Clock,
   Users,
-  History,
-  CalendarRange,
-  BarChart3,
   Loader2,
+  ArrowRight,
 } from "lucide-react";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
 import { StatCard } from "@/components/hrm/ui/StatCard";
 import { DataTable } from "@/components/hrm/ui/DataTable";
 import { StatusBadge } from "@/components/hrm/ui/StatusBadge";
+import { EmployeeAvatar } from "@/components/hrm/ui/EmployeeAvatar";
+import { LeaveBalanceStrip } from "@/components/hrm/leave/LeaveBalanceStrip";
 import { Button } from "@/components/ui/button";
 import { apiGet } from "@/lib/api-client";
 import type { LeaveBalance, LeaveRequest, PaginatedResponse } from "@/lib/types/leave";
@@ -23,33 +23,47 @@ import type { LeaveBalance, LeaveRequest, PaginatedResponse } from "@/lib/types/
 const TABLE_COLUMNS = [
   { key: "employee", label: "Employee" },
   { key: "type", label: "Leave Type" },
-  { key: "start", label: "Start" },
-  { key: "end", label: "End" },
-  { key: "days", label: "Days" },
+  { key: "duration", label: "Duration" },
+  { key: "days", label: "Days", mono: true },
   { key: "status", label: "Status" },
-  { key: "action", label: "" },
 ];
 
-const quickLinks = [
-  {
-    label: "View My Leave History",
-    href: "/leave/history",
-    icon: History,
-    description: "See all past leave records",
-  },
-  {
-    label: "Team Leave Calendar",
-    href: "/leave/calendar",
-    icon: CalendarRange,
-    description: "View who's off and when",
-  },
-  {
-    label: "Leave Balances",
-    href: "/leave/balance",
-    icon: BarChart3,
-    description: "Check remaining entitlements",
-  },
-];
+function formatLeaveDuration(start: string, end: string): string {
+  const startDate = new Date(`${start}T00:00:00`);
+  const endDate = new Date(`${end}T00:00:00`);
+  const monthYear = startDate.toLocaleDateString("en-GB", {
+    month: "short",
+    year: "numeric",
+  });
+
+  if (start === end) {
+    return startDate.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  const sameMonth =
+    startDate.getMonth() === endDate.getMonth() &&
+    startDate.getFullYear() === endDate.getFullYear();
+
+  if (sameMonth) {
+    return `${startDate.getDate()}–${endDate.getDate()} ${monthYear}`;
+  }
+
+  const startLabel = startDate.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+  const endLabel = endDate.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  return `${startLabel} – ${endLabel}`;
+}
 
 export default function LeaveDashboardPage() {
   const currentYear = new Date().getFullYear();
@@ -76,12 +90,12 @@ export default function LeaveDashboardPage() {
     ? requests
     : requests?.results ?? [];
 
-  const annualBalance = balanceList.find(
-    (b) => b.leave_type.name.toLowerCase().includes("annual")
+  const annualBalance = balanceList.find((b) =>
+    b.leave_type.name.toLowerCase().includes("annual")
   );
   const totalUsed = balanceList.reduce((acc, b) => acc + b.used_days, 0);
-  const pendingCount = requestList.filter(
-    (r) => r.status.startsWith("PENDING")
+  const pendingCount = requestList.filter((r) =>
+    r.status.startsWith("PENDING")
   ).length;
   const onLeaveToday = requestList.filter((r) => {
     if (r.status !== "APPROVED") return false;
@@ -91,38 +105,44 @@ export default function LeaveDashboardPage() {
 
   const isLoading = balancesLoading || requestsLoading;
 
-  const tableRows = requestList.slice(0, 5).map((row) => ({
-    employee: (
-      <span className="font-medium text-foreground">
-        {row.employee.first_name} {row.employee.last_name}
-      </span>
-    ),
-    type: <span className="text-muted-foreground">{row.leave_type.name}</span>,
-    start: <span className="text-muted-foreground">{row.start_date}</span>,
-    end: <span className="text-muted-foreground">{row.end_date}</span>,
-    days: <span className="text-muted-foreground">{row.total_working_days}</span>,
-    status: <StatusBadge status={row.status} />,
-    action: (
-      <Link
-        href={`/leave/requests/${row.id}`}
-        className="cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors duration-200 hover:bg-muted hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      >
-        View
-      </Link>
-    ),
-  }));
+  const tableRows = requestList.slice(0, 5).map((row) => {
+    const name = `${row.employee.first_name} ${row.employee.last_name}`;
+    return {
+      employee: (
+        <Link
+          href={`/leave/requests/${row.id}`}
+          className="flex items-center gap-3 hover:opacity-80"
+        >
+          <EmployeeAvatar name={name} />
+          <span className="font-medium text-on-surface">{name}</span>
+        </Link>
+      ),
+      type: (
+        <span className="text-on-surface-variant">{row.leave_type.name}</span>
+      ),
+      duration: (
+        <span className="text-on-surface-variant">
+          {formatLeaveDuration(row.start_date, row.end_date)}
+        </span>
+      ),
+      days: (
+        <span className="text-on-surface-variant">{row.total_working_days}</span>
+      ),
+      status: <StatusBadge status={row.status} />,
+    };
+  });
 
   return (
-    <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <div className="space-y-6">
       <PageHeader
         title="Leave Management"
-        subtitle="Manage, request, and track leave across your organisation."
+        subtitle="Track, apply, and manage leave across your organisation."
         action={
           <Button
             nativeButton={false}
             render={<Link href="/leave/apply" />}
             size="lg"
-            className="rounded-full px-5 shadow-sm"
+            className="rounded-xl px-6"
           >
             Apply for Leave
           </Button>
@@ -131,78 +151,60 @@ export default function LeaveDashboardPage() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="h-6 w-6 animate-spin text-on-surface-variant" />
         </div>
       ) : (
-        <section className="space-y-6 rounded-2xl border border-border/90 bg-card p-5 shadow-sm sm:p-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               label="Annual Leave Balance"
               value={String(annualBalance?.remaining_days ?? 0)}
-              icon={<CalendarDays className="h-4 w-4" />}
+              icon={<CalendarDays />}
               trend="days remaining"
             />
             <StatCard
               label="Leave Taken This Year"
               value={String(totalUsed)}
-              icon={<CheckCircle className="h-4 w-4" />}
+              icon={<CheckCircle />}
               trend="days"
             />
             <StatCard
               label="Pending Requests"
               value={String(pendingCount)}
-              icon={<Clock className="h-4 w-4" />}
+              icon={<Clock />}
+              trend="requests"
+              accent="warning"
             />
             <StatCard
               label="On Leave Today"
               value={String(onLeaveToday)}
-              icon={<Users className="h-4 w-4" />}
+              icon={<Users />}
               trend="staff"
             />
           </div>
+
+          <LeaveBalanceStrip balances={balanceList} />
 
           <DataTable
             columns={TABLE_COLUMNS}
             rows={tableRows}
             emptyMessage="No leave requests found."
             header={
-              <div className="flex items-center justify-between px-6 py-4">
-                <h2 className="text-base font-semibold tracking-tight text-foreground">
+              <div className="flex items-center justify-between px-6 py-3">
+                <h2 className="text-base font-semibold text-on-surface">
                   Recent Leave Requests
                 </h2>
                 <Link
                   href="/leave/requests"
-                  className="cursor-pointer rounded-full px-3 py-1.5 text-sm font-medium text-primary transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="flex items-center gap-1 text-sm font-semibold text-primary-container hover:underline"
                 >
-                  View All
+                  View All <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
             }
           />
-        </section>
+        </>
       )}
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {quickLinks.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className="flex cursor-pointer items-center gap-3 rounded-xl border border-border/90 bg-card p-4 shadow-sm transition-colors duration-200 hover:border-border hover:shadow-md"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent">
-              <link.icon className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                {link.label}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {link.description}
-              </p>
-            </div>
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }

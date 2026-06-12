@@ -59,7 +59,7 @@ export default function LoanReportsPage() {
 
   if (!allowed) {
     return (
-      <div className="space-y-4 px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-7xl space-y-4">
         <PageHeader title="Loan reports" subtitle="HR finance reports" />
         <p className="text-sm text-muted-foreground">
           You don&apos;t have permission to access loan reports. HR role is required.
@@ -80,7 +80,7 @@ export default function LoanReportsPage() {
   return (
     <>
       {Toast}
-      <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-8">
         <PageHeader
           title="Loan reports"
           subtitle="Finance views for outstanding balances, repayment schedules, and employee ledgers."

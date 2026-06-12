@@ -39,9 +39,7 @@ import {
 import { getLoanApiErrorMessage } from "@/lib/loans/errors";
 import { formatLoanCurrency, formatLoanDate, formatLoanDateTime } from "@/lib/loans/format";
 import { ApiError } from "@/lib/api-client";
-
-const fieldClass =
-  "w-full rounded-lg border border-border bg-input px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+import { stitchFieldClass } from "@/lib/design/field-styles";
 
 type ApprovalModal = { action: LoanModalAction };
 type HrConfirmAction = "disburse" | "liquidate" | "resignation";
@@ -187,7 +185,7 @@ export default function LoanRequestDetailPage({
   if (error || !loan) {
     const forbidden = error instanceof ApiError && error.status === 403;
     return (
-      <div className="space-y-4 px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-7xl space-y-4">
         <Link
           href="/loans/history"
           className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
@@ -261,7 +259,7 @@ export default function LoanRequestDetailPage({
   return (
     <>
       {Toast}
-      <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-8">
         <Link
           href="/loans/history"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
@@ -372,7 +370,7 @@ export default function LoanRequestDetailPage({
                   step="0.01"
                   value={editAmount}
                   onChange={(e) => setEditAmount(e.target.value)}
-                  className={fieldClass}
+                  className={stitchFieldClass}
                 />
               </div>
               <div>
@@ -385,7 +383,7 @@ export default function LoanRequestDetailPage({
                   max={12}
                   value={editTenure}
                   onChange={(e) => setEditTenure(e.target.value)}
-                  className={fieldClass}
+                  className={stitchFieldClass}
                 />
               </div>
               <div>
@@ -394,7 +392,7 @@ export default function LoanRequestDetailPage({
                   rows={3}
                   value={editPurpose}
                   onChange={(e) => setEditPurpose(e.target.value)}
-                  className={fieldClass}
+                  className={stitchFieldClass}
                 />
               </div>
               <div className="flex gap-2">

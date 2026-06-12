@@ -19,7 +19,7 @@ export default function UsersPage() {
   const onDepartments = pathname.startsWith("/departments");
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <div className="mx-auto max-w-7xl space-y-6">
       <div className="space-y-1 border-b border-border/80 pb-5">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           User Management

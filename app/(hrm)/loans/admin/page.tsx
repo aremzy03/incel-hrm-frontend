@@ -156,7 +156,7 @@ export default function LoanApprovalsPage() {
   return (
     <>
       {Toast}
-      <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-8">
         <PageHeader
           title="Loan approvals"
           subtitle="Review and action loan applications awaiting your approval."

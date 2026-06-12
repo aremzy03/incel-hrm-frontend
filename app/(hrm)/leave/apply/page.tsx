@@ -3,9 +3,19 @@
 import { useMemo, useState, useId } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Paperclip, CheckCircle, Loader2 } from "lucide-react";
+import { Paperclip, CheckCircle, CalendarRange, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Breadcrumb } from "@/components/hrm/ui/Breadcrumb";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
+import type { ApprovalStep } from "@/components/hrm/leave/ApprovalChain";
+import { ApprovalChain } from "@/components/hrm/leave/ApprovalChain";
+import { LeaveBalancePanel } from "@/components/hrm/leave/LeaveBalancePanel";
+import { PolicyNotice } from "@/components/hrm/leave/PolicyNotice";
+import {
+  stitchCardClass,
+  stitchSelectClass,
+  stitchTextareaClass,
+} from "@/lib/design/field-styles";
 import { apiGet, apiPost, ApiError } from "@/lib/api-client";
 import { useDepartmentMembers } from "@/lib/api/departments";
 import { useLeaveTypes } from "@/lib/api/leave-types";
@@ -124,9 +134,6 @@ function isAnnualOrCasual(name: string): boolean {
   return n.includes("annual") || n.includes("casual");
 }
 
-const fieldClass =
-  "w-full rounded-lg border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition";
-
 function FieldLabel({
   htmlFor,
   children,
@@ -139,7 +146,7 @@ function FieldLabel({
   return (
     <label
       htmlFor={htmlFor}
-      className="mb-1.5 block text-sm font-medium text-foreground"
+      className="mb-1.5 block text-label-md text-on-surface-variant"
     >
       {children}
       {optional && (
@@ -148,35 +155,6 @@ function FieldLabel({
         </span>
       )}
     </label>
-  );
-}
-
-function BalanceBar({
-  name,
-  remaining,
-  total,
-}: {
-  name: string;
-  remaining: number;
-  total: number;
-}) {
-  const pct = total > 0 ? (remaining / total) * 100 : 0;
-
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-foreground">{name}</span>
-        <span className="text-xs font-medium text-primary">
-          {remaining}/{total} days
-        </span>
-      </div>
-      <div className="h-1.5 w-full rounded-full bg-muted">
-        <div
-          className="h-1.5 rounded-full bg-primary transition-all"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
   );
 }
 
@@ -221,7 +199,7 @@ export default function ApplyLeavePage() {
     queryFn: () =>
       apiGet<PaginatedResponse<LeaveRequest> | LeaveRequest[]>("leave-requests"),
   });
-  const { data: balancesRaw } = useQuery({
+  const { data: balancesRaw, isLoading: balancesLoading } = useQuery({
     queryKey: ["leave-balances", currentYear],
     queryFn: () =>
       apiGet<PaginatedResponse<LeaveBalance> | LeaveBalance[]>(
@@ -390,15 +368,19 @@ export default function ApplyLeavePage() {
     setOverlapConfirmOpen(false);
   }
 
+  const approvalSteps: ApprovalStep[] = APPROVAL_STEPS.map((label, i) => ({
+    label,
+    state: i === 0 ? "active" : "upcoming",
+  }));
+
   return (
-    <div className="space-y-6 p-8">
-      <nav className="flex items-center gap-2 text-sm" aria-label="Breadcrumb">
-        <Link href="/leave" className="text-primary hover:underline">
-          Leave Management
-        </Link>
-        <span className="text-muted-foreground">/</span>
-        <span className="font-medium text-foreground">Apply for Leave</span>
-      </nav>
+    <div className="mx-auto max-w-7xl space-y-6">
+      <Breadcrumb
+        items={[
+          { label: "Leave Management", href: "/leave" },
+          { label: "Apply for Leave" },
+        ]}
+      />
 
       <PageHeader
         title="Apply for Leave"
@@ -407,7 +389,7 @@ export default function ApplyLeavePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <div className="rounded-xl border border-border bg-card p-6 shadow">
+          <div className={cn(stitchCardClass, "p-6 md:p-8")}>
             <h1 className="text-lg font-semibold text-foreground">
               New Leave Request
             </h1>
@@ -445,7 +427,7 @@ export default function ApplyLeavePage() {
                     id={`${formId}-type`}
                     value={leaveTypeId}
                     onChange={(e) => setLeaveTypeId(e.target.value)}
-                    className={cn(fieldClass, "cursor-pointer")}
+                    className={stitchSelectClass}
                     required
                   >
                     <option value="" disabled>
@@ -481,7 +463,7 @@ export default function ApplyLeavePage() {
                     id={`${formId}-cover`}
                     value={coverPersonId}
                     onChange={(e) => setCoverPersonId(e.target.value)}
-                    className={cn(fieldClass, "cursor-pointer")}
+                    className={stitchSelectClass}
                     disabled={coverOptions.length === 0}
                   >
                     <option value="">
@@ -534,13 +516,16 @@ export default function ApplyLeavePage() {
                 </FieldLabel>
                 <div
                   id={`${formId}-days`}
-                  className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground"
+                  className="flex items-center gap-3 rounded-xl bg-surface-container-low px-4 py-3"
                 >
-                  {startDate && endDate
-                    ? workingDays === 0
-                      ? "0 days (check your dates)"
-                      : `${workingDays} working day${workingDays !== 1 ? "s" : ""}`
-                    : "Select start and end dates"}
+                  <CalendarRange className="h-5 w-5 shrink-0 text-primary-container" />
+                  <span className="text-body-md font-semibold text-on-surface">
+                    {startDate && endDate
+                      ? workingDays === 0
+                        ? "0 days (check your dates)"
+                        : `${workingDays} working day${workingDays !== 1 ? "s" : ""}`
+                      : "Select start and end dates"}
+                  </span>
                 </div>
                 <p className="mt-1.5 text-xs text-muted-foreground">
                   Weekends and public holidays are excluded from the
@@ -558,7 +543,7 @@ export default function ApplyLeavePage() {
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="Briefly describe the reason for your leave..."
-                  className={cn(fieldClass, "resize-none")}
+                  className={stitchTextareaClass}
                 />
               </div>
 
@@ -569,8 +554,8 @@ export default function ApplyLeavePage() {
                 <label
                   htmlFor={`${formId}-file`}
                   className={cn(
-                    "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-4 text-center text-sm text-muted-foreground transition hover:border-primary hover:text-primary",
-                    fileName && "border-primary/50 bg-accent/40"
+                    "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-lowest p-6 text-center text-body-md text-on-surface-variant transition hover:border-primary-container hover:bg-surface-container-low",
+                    fileName && "border-primary-container/50 bg-secondary-container/30"
                   )}
                 >
                   <Paperclip className="h-4 w-4" />
@@ -639,80 +624,10 @@ export default function ApplyLeavePage() {
         </div>
 
         <div className="space-y-4">
-          <div className="sticky top-6 space-y-4">
-            <div className="rounded-xl border border-border bg-card p-5 shadow">
-              <h2 className="mb-4 text-sm font-semibold text-foreground">
-                Leave Balances
-              </h2>
-              <div className="space-y-4">
-                {balances.length > 0 ? (
-                  balances.map((entry) => (
-                    <BalanceBar
-                      key={entry.id}
-                      name={entry.leave_type.name}
-                      remaining={entry.remaining_days}
-                      total={entry.allocated_days}
-                    />
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No balance data available.
-                  </p>
-                )}
-              </div>
-
-              <div className="mt-4 rounded-lg bg-accent p-3 text-xs text-accent-foreground">
-                Leave requests follow a staged approval: Unit Supervisor (if
-                applicable) &rarr; Line Manager &rarr; HR &rarr; Executive
-                Director. Rejection at any stage ends the process.
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-border bg-card p-5 shadow">
-              <h2 className="mb-4 text-sm font-semibold text-foreground">
-                Approval Chain
-              </h2>
-              <ol className="space-y-0" aria-label="Approval steps">
-                {APPROVAL_STEPS.map((step, i) => {
-                  const isFirst = i === 0;
-                  const isLast = i === APPROVAL_STEPS.length - 1;
-
-                  return (
-                    <li key={step} className="flex items-start gap-3">
-                      <div className="flex flex-col items-center">
-                        <div
-                          className={cn(
-                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
-                            isFirst
-                              ? "border-transparent bg-primary text-primary-foreground"
-                              : "border-border bg-muted text-muted-foreground"
-                          )}
-                        >
-                          {i + 1}
-                        </div>
-                        {!isLast && (
-                          <div
-                            className="my-1 w-px flex-1 bg-border"
-                            style={{ minHeight: "1.5rem" }}
-                          />
-                        )}
-                      </div>
-
-                      <span
-                        className={cn(
-                          "pb-6 pt-1 text-sm leading-none",
-                          isFirst
-                            ? "font-semibold text-foreground"
-                            : "text-muted-foreground"
-                        )}
-                      >
-                        {step}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
-            </div>
+          <div className="sticky top-32 space-y-4">
+            <LeaveBalancePanel balances={balances} loading={balancesLoading} />
+            <ApprovalChain steps={approvalSteps} />
+            <PolicyNotice message="Leave requests follow a staged approval: Unit Supervisor (if applicable) → Line Manager → HR → Executive Director. Rejection at any stage ends the process." />
           </div>
         </div>
       </div>

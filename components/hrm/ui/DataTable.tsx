@@ -1,14 +1,13 @@
 interface Column {
   key: string;
   label: string;
+  mono?: boolean;
 }
 
 interface DataTableProps {
   columns: Column[];
   rows: Record<string, React.ReactNode>[];
-  /** Optional card header slot rendered above the table inside the same card */
   header?: React.ReactNode;
-  /** Message shown when rows is empty */
   emptyMessage?: string;
 }
 
@@ -19,30 +18,30 @@ export function DataTable({
   emptyMessage = "No records found.",
 }: DataTableProps) {
   return (
-    <div className="w-full overflow-hidden rounded-xl border border-border/90 bg-card shadow-sm">
-      {header && (
-        <div className="border-b border-border/80">{header}</div>
-      )}
+    <div className="w-full overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-sm">
+      {header ? (
+        <div className="border-b border-outline-variant">{header}</div>
+      ) : null}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-muted/50 text-left">
+        <table className="w-full border-collapse text-left">
+          <thead className="border-b border-outline-variant bg-surface-container-low">
+            <tr>
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className="px-4 py-2.5 text-left text-xs font-semibold tracking-normal text-muted-foreground"
+                  className="px-6 py-3 text-xs font-bold tracking-wider text-on-surface-variant uppercase"
                 >
                   {col.label}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-outline-variant">
             {rows.length === 0 ? (
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-10 text-center text-sm text-muted-foreground"
+                  className="px-6 py-10 text-center text-sm text-on-surface-variant"
                 >
                   {emptyMessage}
                 </td>
@@ -51,10 +50,13 @@ export function DataTable({
               rows.map((row, i) => (
                 <tr
                   key={i}
-                  className="border-t border-border/80 text-foreground transition-colors duration-200 hover:bg-muted/30"
+                  className="text-on-surface transition-colors hover:bg-surface-container-low"
                 >
                   {columns.map((col) => (
-                    <td key={col.key} className="px-4 py-2.5 align-middle">
+                    <td
+                      key={col.key}
+                      className={`px-6 py-3 align-middle text-sm ${col.mono ? "font-data-table text-data-table" : ""}`}
+                    >
                       {row[col.key] ?? null}
                     </td>
                   ))}

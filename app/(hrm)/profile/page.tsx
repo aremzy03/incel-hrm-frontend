@@ -6,9 +6,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
 import { PersonnelForm } from "@/components/hrm/personnel/PersonnelForm";
 import { KeyRound, Loader2, Eye, EyeOff } from "lucide-react";
-
-const fieldClass =
-  "w-full rounded-lg border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition";
+import { stitchCardClass, stitchFieldClass } from "@/lib/design/field-styles";
+import { cn } from "@/lib/utils";
 
 export default function ProfilePage() {
   const { user, isLoading: authLoading, refreshUser, logout } = useAuth();
@@ -60,7 +59,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="mx-auto max-w-7xl">
       <PageHeader
         title="My profile"
         subtitle="Update your personnel record and account settings"
@@ -71,7 +70,7 @@ export default function ProfilePage() {
 
         <form
           onSubmit={handleChangePassword}
-          className="rounded-xl border border-border bg-card p-6 shadow-sm"
+          className={cn(stitchCardClass, "p-6 ambient-shadow")}
         >
           <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
             <KeyRound className="h-4 w-4" />
@@ -97,7 +96,7 @@ export default function ProfilePage() {
               <div className="relative">
                 <input
                   id="profile-current-password"
-                  className={fieldClass}
+                  className={stitchFieldClass}
                   type={showPwd.current ? "text" : "password"}
                   autoComplete="current-password"
                   value={pwd.current_password}
@@ -134,7 +133,7 @@ export default function ProfilePage() {
                 <div className="relative">
                   <input
                     id="profile-new-password"
-                    className={fieldClass}
+                    className={stitchFieldClass}
                     type={showPwd.next ? "text" : "password"}
                     autoComplete="new-password"
                     value={pwd.new_password}
@@ -168,7 +167,7 @@ export default function ProfilePage() {
                 <div className="relative">
                   <input
                     id="profile-new-password-confirm"
-                    className={fieldClass}
+                    className={stitchFieldClass}
                     type={showPwd.confirm ? "text" : "password"}
                     autoComplete="new-password"
                     value={pwd.new_password_confirm}

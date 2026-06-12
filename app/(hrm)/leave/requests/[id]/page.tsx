@@ -17,6 +17,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/hrm/ui/StatusBadge";
+import {
+  ApprovalChain,
+  type ApprovalStep,
+} from "@/components/hrm/leave/ApprovalChain";
+import {
+  stitchCardClass,
+  stitchFieldClass,
+  stitchSelectClass,
+  stitchTextareaClass,
+} from "@/lib/design/field-styles";
 import { apiGet, apiPost, apiPatch, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDepartmentMembers } from "@/lib/api/departments";
@@ -29,8 +39,52 @@ import type {
   LeaveStatus,
 } from "@/lib/types/leave";
 
-const fieldClass =
-  "w-full rounded-lg border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition";
+const APPROVAL_STEP_LABELS = [
+  "Team Lead (if applicable)",
+  "Unit Supervisor (if applicable)",
+  "Line Manager",
+  "HR Department",
+  "Executive Director",
+];
+
+const PENDING_STEP_INDEX: Partial<Record<LeaveStatus, number>> = {
+  PENDING_TEAM_LEAD: 0,
+  PENDING_SUPERVISOR: 1,
+  PENDING_MANAGER: 2,
+  PENDING_HR: 3,
+  PENDING_ED: 4,
+};
+
+function buildApprovalSteps(status: LeaveStatus): ApprovalStep[] {
+  if (status === "APPROVED") {
+    return APPROVAL_STEP_LABELS.map((label) => ({
+      label,
+      state: "completed" as const,
+    }));
+  }
+  if (status === "REJECTED" || status === "CANCELLED") {
+    return APPROVAL_STEP_LABELS.map((label) => ({
+      label,
+      state: "upcoming" as const,
+    }));
+  }
+  const activeIdx = PENDING_STEP_INDEX[status];
+  if (activeIdx === undefined) {
+    return APPROVAL_STEP_LABELS.map((label) => ({
+      label,
+      state: "upcoming" as const,
+    }));
+  }
+  return APPROVAL_STEP_LABELS.map((label, i) => ({
+    label,
+    state:
+      i < activeIdx
+        ? ("completed" as const)
+        : i === activeIdx
+          ? ("active" as const)
+          : ("upcoming" as const),
+  }));
+}
 
 function extractCoverPersonId(
   cp: LeaveRequest["cover_person"]
@@ -174,7 +228,7 @@ function ApproverConfirmModal({
         <div className="mt-5 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition hover:opacity-80"
+            className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-white transition hover:bg-destructive/90"
           >
             Cancel
           </button>
@@ -371,7 +425,7 @@ export default function LeaveRequestDetailPage({
 
   if (requestError || !request) {
     return (
-      <div className="space-y-4 p-8">
+      <div className="mx-auto max-w-7xl space-y-4">
         <Link
           href="/leave/history"
           className="flex items-center gap-1 text-sm text-primary hover:underline"
@@ -448,7 +502,7 @@ export default function LeaveRequestDetailPage({
   }
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="mx-auto max-w-7xl space-y-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm" aria-label="Breadcrumb">
         <Link href="/leave" className="text-primary hover:underline">
@@ -570,7 +624,7 @@ export default function LeaveRequestDetailPage({
                     onChange={(e) =>
                       setEditForm((f) => f && { ...f, leave_type: e.target.value })
                     }
-                    className={cn(fieldClass, "cursor-pointer")}
+                    className={stitchSelectClass}
                   >
                     {leaveTypes.map((t) => (
                       <option key={t.id} value={t.id}>
@@ -591,7 +645,7 @@ export default function LeaveRequestDetailPage({
                           f ? { ...f, cover_person: e.target.value } : null
                         )
                       }
-                      className={cn(fieldClass, "cursor-pointer")}
+                      className={stitchSelectClass}
                     >
                       <option value="">Select reliever</option>
                       {coverOptions.map((m) => (
@@ -615,7 +669,7 @@ export default function LeaveRequestDetailPage({
                           f ? { ...f, start_date: e.target.value } : null
                         )
                       }
-                      className={fieldClass}
+                      className={stitchFieldClass}
                     />
                   </div>
                   <div>
@@ -631,7 +685,7 @@ export default function LeaveRequestDetailPage({
                           f ? { ...f, end_date: e.target.value } : null
                         )
                       }
-                      className={fieldClass}
+                      className={stitchFieldClass}
                     />
                   </div>
                 </div>
@@ -647,7 +701,7 @@ export default function LeaveRequestDetailPage({
                         f ? { ...f, reason: e.target.value } : null
                       )
                     }
-                    className={cn(fieldClass, "resize-none")}
+                    className={stitchTextareaClass}
                     placeholder="Reason for leave..."
                   />
                 </div>
@@ -757,49 +811,38 @@ export default function LeaveRequestDetailPage({
           </div>
         </div>
 
-        {/* Approval timeline */}
-        <div>
-          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-foreground mb-4">
-              Approval Timeline
-            </h2>
-
-            {logs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No approval actions recorded yet.
-              </p>
-            ) : (
-              <ol className="space-y-0">
-                {logs.map((log, i) => {
-                  const isLast = i === logs.length - 1;
+        <div className="space-y-4">
+          <ApprovalChain
+            title="Approval Timeline"
+            steps={buildApprovalSteps(request.status)}
+          />
+          {logs.length > 0 && (
+            <div className={cn(stitchCardClass, "p-5")}>
+              <h3 className="mb-4 text-title-sm font-semibold text-on-surface">
+                Activity Log
+              </h3>
+              <ol className="space-y-3">
+                {logs.map((log) => {
                   const actorName = log.actor
                     ? `${log.actor.first_name} ${log.actor.last_name}`
                     : "System";
-
                   return (
-                    <li key={log.id} className="flex gap-3">
-                      <div className="flex flex-col items-center">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
-                          {getActionIcon(log.action)}
-                        </div>
-                        {!isLast && (
-                          <div
-                            className="my-1 w-px flex-1 bg-border"
-                            style={{ minHeight: "1.5rem" }}
-                          />
-                        )}
+                    <li
+                      key={log.id}
+                      className="flex gap-3 border-b border-outline-variant/50 pb-3 last:border-0 last:pb-0"
+                    >
+                      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-container-low">
+                        {getActionIcon(log.action)}
                       </div>
-
-                      <div className={cn("pb-4", isLast && "pb-0")}>
-                        <p className="text-sm font-medium text-foreground">
+                      <div>
+                        <p className="text-body-md font-medium text-on-surface">
                           {approvalLogTitle(log)}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          by {actorName} &middot;{" "}
-                          {formatTimestamp(log.timestamp)}
+                        <p className="text-label-md text-on-surface-variant">
+                          by {actorName} &middot; {formatTimestamp(log.timestamp)}
                         </p>
                         {log.comment && (
-                          <p className="mt-1 rounded-md bg-muted/50 px-2 py-1 text-xs text-muted-foreground">
+                          <p className="mt-1 rounded-lg bg-surface-container-low px-2 py-1 text-label-md text-on-surface-variant">
                             &ldquo;{log.comment}&rdquo;
                           </p>
                         )}
@@ -808,8 +851,8 @@ export default function LeaveRequestDetailPage({
                   );
                 })}
               </ol>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

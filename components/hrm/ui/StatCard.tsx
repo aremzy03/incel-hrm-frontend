@@ -4,11 +4,10 @@ interface StatCardProps {
   label: string;
   value: string | number;
   icon: React.ReactNode;
-  /** Secondary line below the value (e.g. “days remaining”). */
   trend?: string;
-  /** Optional change badge (e.g. “+12%”). */
   delta?: string;
   deltaTone?: "positive" | "negative" | "neutral";
+  accent?: "default" | "warning";
 }
 
 export function StatCard({
@@ -18,40 +17,46 @@ export function StatCard({
   trend,
   delta,
   deltaTone = "neutral",
+  accent = "default",
 }: StatCardProps) {
   return (
-    <div className="rounded-xl border border-border/90 bg-card p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-[11px] font-medium leading-none tracking-wide text-muted-foreground">
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest p-4 custom-shadow transition-all hover:border-primary/30",
+        accent === "warning" && "hover:border-amber-500/30"
+      )}
+    >
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
           {label}
         </span>
-        <span className="shrink-0 text-primary [&_svg]:size-4">{icon}</span>
+        <span
+          className={cn(
+            "shrink-0 transition-transform group-hover:scale-110 [&_svg]:size-5",
+            accent === "warning" ? "text-amber-500" : "text-primary"
+          )}
+        >
+          {icon}
+        </span>
       </div>
-      <div className="mt-2 flex flex-wrap items-baseline gap-2">
-        <p className="text-3xl font-bold tracking-tight text-foreground tabular-nums">
-          {value}
-        </p>
+      <div className="flex flex-wrap items-baseline gap-1">
+        <p className="text-3xl font-bold text-on-surface tabular-nums">{value}</p>
+        {trend ? (
+          <p className="text-sm font-medium text-on-surface-variant">{trend}</p>
+        ) : null}
         {delta ? (
           <span
             className={cn(
               "rounded-full px-2 py-0.5 text-xs font-medium tabular-nums",
-              deltaTone === "positive" &&
-                "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-              deltaTone === "negative" &&
-                "bg-red-500/10 text-red-700 dark:text-red-400",
-              deltaTone === "neutral" &&
-                "bg-muted text-muted-foreground"
+              deltaTone === "positive" && "bg-green-100 text-green-700",
+              deltaTone === "negative" && "bg-red-100 text-red-700",
+              deltaTone === "neutral" && "bg-surface-container-high text-on-surface-variant"
             )}
           >
             {delta}
           </span>
         ) : null}
       </div>
-      {trend ? (
-        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-          {trend}
-        </p>
-      ) : null}
     </div>
   );
 }
