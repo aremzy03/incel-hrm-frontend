@@ -3,6 +3,7 @@ import { LOAN_STATUS_DISPLAY, type LoanStatus } from "@/lib/types/loan";
 
 const STYLE_MAP: Record<LoanStatus, string> = {
   DRAFT: "bg-secondary text-secondary-foreground",
+  PENDING_MANAGER: "bg-amber-100 text-amber-700",
   PENDING_HR: "bg-yellow-100 text-yellow-700",
   PENDING_ED: "bg-yellow-100 text-yellow-700",
   PENDING_MD: "bg-yellow-100 text-yellow-700",

@@ -8,7 +8,9 @@ export type NotificationType =
   | "LOAN_REJECTED"
   | "LOAN_DISBURSED"
   | "LOAN_LIQUIDATED"
-  | "LOAN_CLOSED";
+  | "LOAN_CLOSED"
+  | "LOAN_OBSERVER_NOTICE"
+  | "LOAN_ACTION_REQUIRED";
 
 export interface NotificationItem {
   notification_id: string;
@@ -17,6 +19,7 @@ export interface NotificationItem {
   body: string;
   data?: {
     leave_request_id?: string;
+    loan_id?: string;
     status?: string;
     [key: string]: unknown;
   };

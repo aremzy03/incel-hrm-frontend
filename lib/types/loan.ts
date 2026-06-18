@@ -6,6 +6,7 @@ import type { PaginatedResponse } from "./leave";
 
 export type LoanStatus =
   | "DRAFT"
+  | "PENDING_MANAGER"
   | "PENDING_HR"
   | "PENDING_ED"
   | "PENDING_MD"
@@ -17,6 +18,7 @@ export type LoanStatus =
 
 export const LOAN_STATUS_DISPLAY: Record<LoanStatus, string> = {
   DRAFT: "Draft",
+  PENDING_MANAGER: "Pending Line Manager",
   PENDING_HR: "Pending HR",
   PENDING_ED: "Pending Executive Director",
   PENDING_MD: "Pending Managing Director",
@@ -125,6 +127,7 @@ export interface LoanApplication {
   closed_at: string | null;
   resignation_deducted: boolean;
   repayment_schedule: LoanRepaymentScheduleItem[];
+  manager_approver_is_management: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -194,4 +197,21 @@ export interface ScheduleSummaryReportResponse {
 export interface EmployeeLoanLedgerResponse {
   employee_id: string;
   loans: LoanApplicationLedgerItem[];
+}
+
+// ---------------------------------------------------------------------------
+// Loan settings (HR only)
+// ---------------------------------------------------------------------------
+
+export interface LoanSettings {
+  require_line_manager_approval: boolean;
+  observer_department: { id: string; name: string } | null;
+  observer_unit: { id: string; name: string } | null;
+  updated_at: string;
+}
+
+export interface LoanSettingsPatchPayload {
+  require_line_manager_approval?: boolean;
+  observer_department_id?: string | null;
+  observer_unit_id?: string | null;
 }

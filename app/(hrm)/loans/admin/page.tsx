@@ -38,6 +38,7 @@ function pendingStatusForUser(
   user: ReturnType<typeof useAuth>["user"]
 ): LoanStatus | null {
   if (!user) return null;
+  if (hasRole(user, "LINE_MANAGER")) return "PENDING_MANAGER";
   if (hasRole(user, "HR")) return "PENDING_HR";
   if (hasRole(user, "EXECUTIVE_DIRECTOR")) return "PENDING_ED";
   if (hasRole(user, "MANAGING_DIRECTOR")) return "PENDING_MD";
@@ -93,6 +94,8 @@ export default function LoanApprovalsPage() {
       );
     }
   }
+
+  const isLineManager = hasRole(user, "LINE_MANAGER");
 
   const tableRows = pendingLoans.map((row) => {
     const { canApprove, canReject } = canUserActOnLoanApplication(user, row);
@@ -158,7 +161,11 @@ export default function LoanApprovalsPage() {
       {Toast}
       <div className="mx-auto max-w-7xl space-y-8">
         <PageHeader
-          title="Loan approvals"
+          title={
+            isLineManager && pendingStatus === "PENDING_MANAGER"
+              ? "Loans awaiting your approval"
+              : "Loan approvals"
+          }
           subtitle="Review and action loan applications awaiting your approval."
         />
 
@@ -167,11 +174,31 @@ export default function LoanApprovalsPage() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
+          <>
+          <div data-tour="loans-approvals-queue">
           <DataTable
             columns={TABLE_COLUMNS}
             rows={tableRows}
             emptyMessage="No pending approvals for your role."
           />
+          </div>
+          <p
+            data-tour="loans-approval-actions"
+            className="mt-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+          >
+            Approve or reject from the Actions column. Managing Director approval
+            requires a comment.
+          </p>
+          {hasRole(user, "HR") ? (
+          <p
+            data-tour="loans-hr-actions"
+            className="mt-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+          >
+            HR can disburse approved loans, update repayment status, liquidate
+            active loans, and handle resignation from the request detail page.
+          </p>
+          ) : null}
+          </>
         )}
       </div>
 

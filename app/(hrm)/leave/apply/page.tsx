@@ -382,10 +382,12 @@ export default function ApplyLeavePage() {
         ]}
       />
 
+      <div data-tour="leave-apply-intro">
       <PageHeader
         title="Apply for Leave"
         subtitle="Submit a request for approval. Approvals may include Unit Supervisor (if applicable), Line Manager, HR, and Executive Director."
       />
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
@@ -416,7 +418,7 @@ export default function ApplyLeavePage() {
               onSubmit={handleSubmit}
               className="mt-6 space-y-5"
             >
-              <div>
+              <div data-tour="leave-type-select">
                 <FieldLabel htmlFor={`${formId}-type`}>Leave Type</FieldLabel>
                 {typesLoading ? (
                   <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
@@ -454,31 +456,40 @@ export default function ApplyLeavePage() {
                 )}
               </div>
 
-              {deptId && (
-                <div>
-                  <FieldLabel htmlFor={`${formId}-cover`} optional>
-                    Reliever
-                  </FieldLabel>
-                  <select
-                    id={`${formId}-cover`}
-                    value={coverPersonId}
-                    onChange={(e) => setCoverPersonId(e.target.value)}
-                    className={stitchSelectClass}
-                    disabled={coverOptions.length === 0}
-                  >
-                    <option value="">
-                      {coverOptions.length === 0 ? "No relievers available" : "None"}
-                    </option>
-                    {coverOptions.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.full_name}
+              <div data-tour="leave-cover-person">
+                {deptId ? (
+                  <>
+                    <FieldLabel htmlFor={`${formId}-cover`} optional>
+                      Reliever
+                    </FieldLabel>
+                    <select
+                      id={`${formId}-cover`}
+                      value={coverPersonId}
+                      onChange={(e) => setCoverPersonId(e.target.value)}
+                      className={stitchSelectClass}
+                      disabled={coverOptions.length === 0}
+                    >
+                      <option value="">
+                        {coverOptions.length === 0
+                          ? "No relievers available"
+                          : "None"}
                       </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                      {coverOptions.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.full_name}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Reliever selection is available once you are assigned to a
+                    department.
+                  </p>
+                )}
+              </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" data-tour="leave-date-range">
                 <div>
                   <FieldLabel htmlFor={`${formId}-start`}>
                     Start Date
@@ -576,16 +587,17 @@ export default function ApplyLeavePage() {
                 </label>
               </div>
 
-              {submitted ? (
-                <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-                  <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                  <span>
-                    Your leave request has been submitted and is now awaiting
-                    approval.
-                  </span>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <div data-tour="leave-submit-actions">
+                {submitted ? (
+                  <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                    <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                    <span>
+                      Your leave request has been submitted and is now awaiting
+                      approval.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     onClick={doSaveDraft}
@@ -618,7 +630,8 @@ export default function ApplyLeavePage() {
                     )}
                   </button>
                 </div>
-              )}
+                )}
+              </div>
             </form>
           </div>
         </div>
@@ -626,7 +639,9 @@ export default function ApplyLeavePage() {
         <div className="space-y-4">
           <div className="sticky top-32 space-y-4">
             <LeaveBalancePanel balances={balances} loading={balancesLoading} />
-            <ApprovalChain steps={approvalSteps} />
+            <div data-tour="leave-approval-chain">
+              <ApprovalChain steps={approvalSteps} />
+            </div>
             <PolicyNotice message="Leave requests follow a staged approval: Unit Supervisor (if applicable) → Line Manager → HR → Executive Director. Rejection at any stage ends the process." />
           </div>
         </div>

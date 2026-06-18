@@ -282,11 +282,13 @@ export default function LeaveCalendarPage() {
           ]}
         />
 
+        <div data-tour="leave-calendar-intro">
         <PageHeader
           title="Leave Calendar"
           subtitle="See approved leave across your department this month."
           action={
             <div
+              data-tour="leave-calendar-view"
               className="flex rounded-full bg-muted p-1 gap-1"
               role="group"
               aria-label="View mode"
@@ -309,6 +311,7 @@ export default function LeaveCalendarPage() {
             </div>
           }
         />
+        </div>
 
         {/* Month navigator */}
         <div className="flex items-center gap-4">
@@ -350,7 +353,7 @@ export default function LeaveCalendarPage() {
         </div>
 
         {/* Calendar grid */}
-        <div className={cn(stitchCardClass, "overflow-hidden")}>
+        <div className={cn(stitchCardClass, "overflow-hidden")} data-tour="leave-calendar-grid">
           <div className="grid grid-cols-7 border-b border-outline-variant">
             {DOW_LABELS.map((day) => (
               <div

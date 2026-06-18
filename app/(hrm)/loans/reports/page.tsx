@@ -11,8 +11,7 @@ import {
   useEmployeeLedgerReport,
   downloadLoanReportCsv,
 } from "@/lib/api/loans";
-import { useAuth } from "@/contexts/AuthContext";
-import { canAccessLoanReports } from "@/lib/rbac";
+import { useLoanAccessFlags } from "@/lib/loans/access";
 import { formatLoanCurrency, formatLoanDate } from "@/lib/loans/format";
 import { getLoanApiErrorMessage } from "@/lib/loans/errors";
 import { useLoanToast } from "@/components/hrm/loans/LoanToast";
@@ -23,9 +22,9 @@ const selectClass =
   "rounded-lg border border-border bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
 export default function LoanReportsPage() {
-  const { user } = useAuth();
+  const { hasReportAccess: allowed, isLoading: accessLoading } =
+    useLoanAccessFlags();
   const { showToast, Toast } = useLoanToast();
-  const allowed = canAccessLoanReports(user);
 
   const [tab, setTab] = useState<Tab>("outstanding");
   const [loanTypeFilter, setLoanTypeFilter] = useState("");
@@ -57,12 +56,21 @@ export default function LoanReportsPage() {
     }
   }
 
+  if (accessLoading) {
+    return (
+      <div className="flex justify-center py-24">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   if (!allowed) {
     return (
       <div className="mx-auto max-w-7xl space-y-4">
         <PageHeader title="Loan reports" subtitle="HR finance reports" />
         <p className="text-sm text-muted-foreground">
-          You don&apos;t have permission to access loan reports. HR role is required.
+          You don&apos;t have permission to access loan reports. HR or authorized
+          observer access is required.
         </p>
         <Link href="/loans" className="text-sm text-primary hover:underline">
           Back to Staff Loans
@@ -86,7 +94,7 @@ export default function LoanReportsPage() {
           subtitle="Finance views for outstanding balances, repayment schedules, and employee ledgers."
         />
 
-        <div className="flex flex-wrap gap-2 border-b border-border pb-2">
+        <div className="flex flex-wrap gap-2 border-b border-border pb-2" data-tour="loans-reports-nav">
           {tabs.map((t) => (
             <button
               key={t.id}

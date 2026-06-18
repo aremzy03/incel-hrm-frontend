@@ -1,11 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiGet, apiPatch, apiPost } from "@/lib/api-client";
+import { useAuth } from "@/contexts/AuthContext";
+import { hasRole } from "@/lib/rbac";
 import type {
   EmployeeLoanLedgerResponse,
   LoanApplication,
   LoanApplicationCreatePayload,
   LoanApplicationPatchPayload,
   LoanApprovalLog,
+  LoanSettings,
+  LoanSettingsPatchPayload,
   LoanType,
   LoanRepaymentPaymentStatusPayload,
   LoanWorkflowCommentPayload,
@@ -39,6 +43,7 @@ export const loanKeys = {
   logs: (id: string) => [...loanKeys.all, "logs", id] as const,
   reports: {
     all: () => [...loanKeys.all, "reports"] as const,
+    access: () => [...loanKeys.all, "reports", "access-probe"] as const,
     outstanding: (filters?: OutstandingLoansReportParams) =>
       [...loanKeys.all, "reports", "outstanding", filters ?? {}] as const,
     scheduleSummary: () =>
@@ -46,6 +51,7 @@ export const loanKeys = {
     employeeLedger: (employeeId: string) =>
       [...loanKeys.all, "reports", "employee-ledger", employeeId] as const,
   },
+  settings: () => [...loanKeys.all, "settings"] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -215,6 +221,50 @@ export function useEmployeeLedgerReport(
         `loans/reports/employee-ledger/${employeeId}/`
       ),
     enabled: !!employeeId && (options?.enabled ?? true),
+  });
+}
+
+const LOAN_REPORT_ACCESS_STALE_MS = 5 * 60 * 1000;
+
+/** Probe report access for HR or loan observers (non-HR only). */
+export function useLoanReportAccess() {
+  const { user } = useAuth();
+  const isHr = hasRole(user, "HR");
+
+  const probe = useQuery<OutstandingLoansReportResponse>({
+    queryKey: loanKeys.reports.access(),
+    queryFn: () => apiGet<OutstandingLoansReportResponse>("loans/reports/outstanding/"),
+    enabled: !!user && !isHr,
+    retry: false,
+    staleTime: LOAN_REPORT_ACCESS_STALE_MS,
+  });
+
+  return {
+    hasAccess: isHr || probe.isSuccess,
+    isLoading: !isHr && !!user && probe.isLoading,
+    isError: !isHr && probe.isError,
+  };
+}
+
+export function useLoanSettings() {
+  const { user } = useAuth();
+  const isHr = hasRole(user, "HR");
+
+  return useQuery<LoanSettings>({
+    queryKey: loanKeys.settings(),
+    queryFn: () => apiGet<LoanSettings>("loan-settings/"),
+    enabled: isHr,
+  });
+}
+
+export function usePatchLoanSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: LoanSettingsPatchPayload) =>
+      apiPatch<LoanSettings>("loan-settings/", payload),
+    onSuccess: (data) => {
+      qc.setQueryData(loanKeys.settings(), data);
+    },
   });
 }
 

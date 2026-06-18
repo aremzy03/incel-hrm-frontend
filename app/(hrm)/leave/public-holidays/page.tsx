@@ -79,7 +79,7 @@ export default function LeavePublicHolidaysPage() {
         subtitle="Upload a CSV to create or update public holidays for highlighting and working-day calculations."
       />
 
-      <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+      <div className="rounded-xl border border-border bg-card p-6 shadow-sm" data-tour="leave-holidays-upload">
         <div className="space-y-2">
           <p className="text-sm font-medium text-foreground">Upload holidays CSV</p>
           <p className="text-xs text-muted-foreground">
@@ -132,6 +132,14 @@ export default function LeavePublicHolidaysPage() {
             </div>
           </div>
         )}
+      </div>
+
+      <div
+        data-tour="leave-holidays-list"
+        className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
+      >
+        Uploaded holidays are used in leave date pickers and working-day
+        calculations for the selected year.
       </div>
     </div>
   );

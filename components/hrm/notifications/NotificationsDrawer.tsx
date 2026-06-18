@@ -30,6 +30,21 @@ function getLeaveHref(n: NotificationItem): string | null {
   return id ? `/leave/requests/${id}` : null;
 }
 
+function getLoanHref(n: NotificationItem): string | null {
+  const id = n.data?.loan_id;
+  if (typeof id === "string" && id) {
+    return `/loans/requests/${id}`;
+  }
+  return null;
+}
+
+function getNotificationHref(n: NotificationItem): string | null {
+  if (n.type.startsWith("LOAN_")) {
+    return getLoanHref(n);
+  }
+  return getLeaveHref(n);
+}
+
 export function NotificationsDrawer({
   open,
   onClose,
@@ -173,7 +188,7 @@ export function NotificationsDrawer({
           ) : (
             <ul className="space-y-2">
               {notifications.map((n, idx) => {
-                const href = getLeaveHref(n);
+                const href = getNotificationHref(n);
                 const unread = n.is_read === false;
                 const notificationId = n.notification_id;
 
@@ -245,6 +260,11 @@ function NotificationRow({
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-on-surface">{n.title}</p>
         <p className="mt-1 line-clamp-2 text-sm text-on-surface-variant">{n.body}</p>
+        {n.type === "LOAN_OBSERVER_NOTICE" && (
+          <p className="mt-1 text-xs text-on-surface-variant/80">
+            For your information — no action required
+          </p>
+        )}
         <p className="mt-2 text-xs text-on-surface-variant">
           {formatWhen(n.created_at)}
         </p>

@@ -16,6 +16,21 @@ interface LoanActionDialogProps {
   isPending: boolean;
 }
 
+function approvalNextStepCopy(status: LoanStatus): string {
+  switch (status) {
+    case "PENDING_MANAGER":
+      return "Approving moves this application to HR review.";
+    case "PENDING_HR":
+      return "Approving moves this application to the Executive Director.";
+    case "PENDING_ED":
+      return "Approving moves this application to the Managing Director.";
+    case "PENDING_MD":
+      return "Approving fully approves this loan application.";
+    default:
+      return "Approving moves this application to the next stage in the approval chain.";
+  }
+}
+
 export function LoanActionDialog({
   action,
   loan,
@@ -58,7 +73,7 @@ export function LoanActionDialog({
         <h2 className="text-lg font-semibold text-foreground">{confirmTitle}</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           {isApprove
-            ? "Approving moves this application to the next stage in the chain (HR → ED → MD)."
+            ? approvalNextStepCopy(loan.status as LoanStatus)
             : "Rejecting ends the process and notifies the employee."}
         </p>
 

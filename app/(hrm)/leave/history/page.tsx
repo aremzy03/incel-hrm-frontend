@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, X, Loader2, Eye } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/hrm/ui/StatusBadge";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
@@ -112,21 +112,33 @@ export default function LeaveHistoryPage() {
           ]}
         />
 
+        <div data-tour="leave-history-intro">
         <PageHeader
           title="My Leave History"
           subtitle="Your leave requests and current balances for the year."
         />
+        </div>
 
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <>
+        <div data-tour="leave-history-balances">
+          {isLoading ? (
+            <div className="h-20 animate-pulse rounded-xl bg-muted" />
+          ) : (
             <LeaveBalanceStrip balances={balances} />
+          )}
+        </div>
 
-            <div>
-              <div className="mb-4 flex flex-wrap gap-3">
+        <div>
+          <div
+            className="mb-4 flex flex-wrap gap-3"
+            data-tour="leave-history-filters"
+          >
+            {isLoading ? (
+              <div className="flex gap-3">
+                <div className="h-10 w-40 animate-pulse rounded-lg bg-muted" />
+                <div className="h-10 w-40 animate-pulse rounded-lg bg-muted" />
+              </div>
+            ) : (
+              <>
                 <select
                   value={statusFilter}
                   className={stitchSelectClass}
@@ -174,8 +186,15 @@ export default function LeaveHistoryPage() {
                     Clear filters
                   </button>
                 )}
-              </div>
+              </>
+            )}
+          </div>
 
+          <div data-tour="leave-history-table">
+            {isLoading ? (
+              <div className="h-48 animate-pulse rounded-xl bg-muted" />
+            ) : (
+              <>
               <DataTable
                 columns={TABLE_COLUMNS}
                 emptyMessage="No records match the selected filters."
@@ -253,9 +272,10 @@ export default function LeaveHistoryPage() {
                   </nav>
                 </div>
               )}
-            </div>
-          </>
-        )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </>
   );

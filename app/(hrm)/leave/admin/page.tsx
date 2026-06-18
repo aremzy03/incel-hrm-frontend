@@ -329,7 +329,10 @@ export default function AdminApprovalsPage() {
           </div>
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div
+              className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+              data-tour="leave-approval-filters"
+            >
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <input
@@ -387,6 +390,7 @@ export default function AdminApprovalsPage() {
               )}
             </div>
 
+            <div data-tour="leave-approvals-queue">
             <DataTable
               columns={TABLE_COLUMNS}
               emptyMessage="No leave requests match the selected filters."
@@ -464,6 +468,14 @@ export default function AdminApprovalsPage() {
                 };
               })}
             />
+            </div>
+            <p
+              data-tour="leave-approval-actions"
+              className="mt-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+            >
+              Use the Actions column to approve or reject pending requests. Open a
+              row for full details and approval history.
+            </p>
           </>
         )}
       </div>

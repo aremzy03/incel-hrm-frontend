@@ -1,0 +1,82 @@
+.driver-popover.hrm-tour-popover {
+  background: var(--color-surface-container-lowest, #fff);
+  color: var(--color-on-surface, #1a1a1a);
+  border: 1px solid var(--color-outline-variant, #e0e0e0);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 12%);
+  max-width: 22rem;
+  z-index: 1000000001 !important;
+}
+
+.driver-popover.hrm-tour-popover .driver-popover-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding-right: 1.5rem;
+}
+
+.driver-popover.hrm-tour-popover .driver-popover-description {
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--color-on-surface-variant, #5f5f5f);
+}
+
+.driver-popover.hrm-tour-popover .driver-popover-footer {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-outline-variant, #e0e0e0);
+}
+
+.driver-popover.hrm-tour-popover .driver-popover-progress-text {
+  font-size: 0.75rem;
+  color: var(--color-on-surface-variant, #5f5f5f);
+  flex-shrink: 0;
+}
+
+.driver-popover.hrm-tour-popover .driver-popover-navigation-btns {
+  display: flex !important;
+  gap: 0.5rem;
+}
+
+.driver-popover.hrm-tour-popover .driver-popover-next-btn,
+.driver-popover.hrm-tour-popover .driver-popover-prev-btn {
+  display: inline-block !important;
+  box-sizing: border-box;
+  min-width: 4.5rem;
+  padding: 0.45rem 0.85rem !important;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-shadow: none;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+.driver-popover.hrm-tour-popover .driver-popover-prev-btn {
+  background: var(--color-surface-container-low, #f0f3ff) !important;
+  color: var(--color-on-surface, #1a1a1a) !important;
+  border: 1px solid var(--color-outline-variant, #c6c5d6) !important;
+}
+
+.driver-popover.hrm-tour-popover .driver-popover-next-btn {
+  background: var(--color-primary-container, #111fa2) !important;
+  color: #fff !important;
+  border: 1px solid var(--color-primary-container, #111fa2) !important;
+}
+
+.driver-popover.hrm-tour-popover .driver-popover-prev-btn:hover,
+.driver-popover.hrm-tour-popover .driver-popover-next-btn:hover {
+  opacity: 0.92;
+}
+
+.driver-popover.hrm-tour-popover .driver-popover-close-btn {
+  color: var(--color-on-surface-variant, #767685);
+}
+
+.driver-popover.hrm-tour-popover .driver-popover-close-btn:hover {
+  color: var(--color-on-surface, #1a1a1a);
+}

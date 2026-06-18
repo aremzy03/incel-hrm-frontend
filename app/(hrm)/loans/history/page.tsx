@@ -7,8 +7,7 @@ import { PageHeader } from "@/components/hrm/ui/PageHeader";
 import { DataTable } from "@/components/hrm/ui/DataTable";
 import { LoanStatusBadge } from "@/components/hrm/loans/LoanStatusBadge";
 import { useLoanApplications, useLoanTypes } from "@/lib/api/loans";
-import { useAuth } from "@/contexts/AuthContext";
-import { isLoanPrivilegedList } from "@/lib/rbac";
+import { useLoanAccessFlags } from "@/lib/loans/access";
 import { formatLoanCurrency, formatLoanDate } from "@/lib/loans/format";
 import { LOAN_STATUS_DISPLAY, type LoanStatus } from "@/lib/types/loan";
 import { Button } from "@/components/ui/button";
@@ -37,8 +36,7 @@ function sortByCreatedDesc<T extends { created_at: string }>(items: T[]): T[] {
 }
 
 export default function LoanHistoryPage() {
-  const { user } = useAuth();
-  const privileged = isLoanPrivilegedList(user);
+  const { isPrivilegedList: privileged } = useLoanAccessFlags();
 
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [loanTypeFilter, setLoanTypeFilter] = useState<string>("");
@@ -193,6 +191,8 @@ export default function LoanHistoryPage() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
+        <>
+        <div data-tour="loans-history-table">
         <DataTable
           columns={columns}
           rows={rows}
@@ -202,6 +202,15 @@ export default function LoanHistoryPage() {
               : "You have no loan applications yet. Apply for a loan to get started."
           }
         />
+        </div>
+        <p
+          data-tour="loans-workflow-tip"
+          className="mt-4 rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
+        >
+          Open a draft application to submit it for approval. Active loans show a
+          repayment schedule on the request detail page after HR disburses.
+        </p>
+        </>
       )}
     </div>
   );

@@ -8,8 +8,7 @@ import { DataTable } from "@/components/hrm/ui/DataTable";
 import { Button } from "@/components/ui/button";
 import { LoanStatusBadge } from "@/components/hrm/loans/LoanStatusBadge";
 import { useLoanApplications } from "@/lib/api/loans";
-import { useAuth } from "@/contexts/AuthContext";
-import { isLoanPrivilegedList } from "@/lib/rbac";
+import { useLoanAccessFlags } from "@/lib/loans/access";
 import { formatLoanCurrency, formatLoanDate } from "@/lib/loans/format";
 import type { LoanApplication, LoanStatus } from "@/lib/types/loan";
 
@@ -22,6 +21,7 @@ const TABLE_COLUMNS = [
 ];
 
 const PENDING_STATUSES: LoanStatus[] = [
+  "PENDING_MANAGER",
   "PENDING_HR",
   "PENDING_ED",
   "PENDING_MD",
@@ -35,8 +35,7 @@ function sortByCreatedDesc(loans: LoanApplication[]): LoanApplication[] {
 }
 
 export default function LoansDashboardPage() {
-  const { user } = useAuth();
-  const privileged = isLoanPrivilegedList(user);
+  const { isPrivilegedList: privileged } = useLoanAccessFlags();
   const { data: loans = [], isLoading } = useLoanApplications();
 
   const sorted = sortByCreatedDesc(loans);
@@ -83,6 +82,7 @@ export default function LoansDashboardPage() {
             : "Apply for loans and track your applications and repayments."
         }
         action={
+          <span data-tour="loans-apply-btn">
           <Button
             nativeButton={false}
             render={<Link href="/loans/apply" />}
@@ -91,6 +91,7 @@ export default function LoansDashboardPage() {
           >
             Apply for loan
           </Button>
+          </span>
         }
       />
 
@@ -100,7 +101,7 @@ export default function LoansDashboardPage() {
         </div>
       ) : (
         <section className="space-y-6 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 custom-shadow sm:p-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3" data-tour="loans-stats">
             <StatCard
               label="Draft applications"
               value={String(draftCount)}

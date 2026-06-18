@@ -258,7 +258,7 @@ export default function LeaveTypesPage() {
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm" data-tour="leave-types-list">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

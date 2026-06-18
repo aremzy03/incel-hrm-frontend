@@ -25,7 +25,8 @@ import {
   useUpdateRepaymentPaymentStatus,
 } from "@/lib/api/loans";
 import { useAuth } from "@/contexts/AuthContext";
-import { canViewLoanLogs } from "@/lib/rbac";
+import { canViewLoanLogs, hasRole } from "@/lib/rbac";
+import { useLoanAccessFlags } from "@/lib/loans/access";
 import type { LoanRepaymentPaymentStatus } from "@/lib/types/loan";
 import {
   canUserActOnLoanApplication,
@@ -35,6 +36,8 @@ import {
   canHrLiquidate,
   canHrHandleResignation,
   canHrUpdateRepaymentPaymentStatus,
+  isLoanOwnerUser,
+  isLoanReadOnlyViewer,
 } from "@/lib/loans/approval";
 import { getLoanApiErrorMessage } from "@/lib/loans/errors";
 import { formatLoanCurrency, formatLoanDate, formatLoanDateTime } from "@/lib/loans/format";
@@ -51,6 +54,7 @@ export default function LoanRequestDetailPage({
 }) {
   const { id } = use(params);
   const { user } = useAuth();
+  const { hasReportAccess, isObserver } = useLoanAccessFlags();
   const { showToast, Toast } = useLoanToast();
 
   const { data: loan, isLoading, error } = useLoanApplication(id);
@@ -82,7 +86,7 @@ export default function LoanRequestDetailPage({
     resignationMutation.isPending ||
     paymentStatusMutation.isPending;
 
-  const viewLogs = canViewLoanLogs(user);
+  const viewLogs = canViewLoanLogs(user, loan, hasReportAccess);
 
   function startEdit() {
     if (!loan) return;
@@ -127,12 +131,15 @@ export default function LoanRequestDetailPage({
       setSubmitConfirm(false);
       showToast("Application submitted for approval.");
     } catch (err) {
-      showToast(
-        getLoanApiErrorMessage(
-          err,
-          "Could not submit application. Check eligibility and try again."
-        )
+      const message = getLoanApiErrorMessage(
+        err,
+        "Could not submit application. Check eligibility and try again."
       );
+      const withCta =
+        message.toLowerCase().includes("line manager")
+          ? `${message} Contact HR to assign a line manager.`
+          : message;
+      showToast(withCta);
     }
   }
 
@@ -202,16 +209,24 @@ export default function LoanRequestDetailPage({
     );
   }
 
-  const { canApprove, canReject } = canUserActOnLoanApplication(user, loan);
+  const readOnlyViewer = isLoanReadOnlyViewer(user, hasReportAccess);
+  const isOwner = isLoanOwnerUser(user, loan);
+  const { canApprove: canApproveRole, canReject: canRejectRole } =
+    canUserActOnLoanApplication(user, loan, hasReportAccess);
+  const canApprove = canApproveRole && !isOwner && !readOnlyViewer;
+  const canReject = canRejectRole && !isOwner && !readOnlyViewer;
   const canEdit = canEmployeeEditLoan(user, loan);
   const canSubmit = canEmployeeSubmitLoan(user, loan);
-  const showDisburse = canHrDisburse(user, loan);
-  const showLiquidate = canHrLiquidate(user, loan);
-  const showResignation = canHrHandleResignation(user, loan);
+  const showDisburse = !readOnlyViewer && canHrDisburse(user, loan);
+  const showLiquidate = !readOnlyViewer && canHrLiquidate(user, loan);
+  const showResignation = !readOnlyViewer && canHrHandleResignation(user, loan);
   const showSchedule =
     loan.repayment_schedule.length > 0 &&
     loan.status !== "DRAFT";
-  const canEditRepaymentStatus = canHrUpdateRepaymentPaymentStatus(user, loan);
+  const canEditRepaymentStatus =
+    !readOnlyViewer && canHrUpdateRepaymentPaymentStatus(user, loan);
+  const showHrRoutingHint =
+    hasRole(user, "HR") && loan.manager_approver_is_management;
   const loanId = loan.id;
 
   async function handlePaymentStatusChange(
@@ -280,7 +295,18 @@ export default function LoanRequestDetailPage({
               Resignation deducted
             </span>
           )}
+          {showHrRoutingHint && (
+            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+              Routed to Management line manager
+            </span>
+          )}
         </div>
+
+        {isObserver && (
+          <div className="rounded-lg border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+            View only — you can review this loan but cannot approve or disburse.
+          </div>
+        )}
 
         {/* Action toolbar */}
         <div className="flex flex-wrap gap-2">
@@ -472,7 +498,7 @@ export default function LoanRequestDetailPage({
       {submitConfirm && (
         <ConfirmDialog
           title="Submit for approval?"
-          body="Your application will be sent to HR for review. You won't be able to edit it after submission."
+          body="Your application will be submitted for approval. You won't be able to edit it after submission."
           confirmLabel="Submit"
           onClose={() => setSubmitConfirm(false)}
           onConfirm={handleSubmit}

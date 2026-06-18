@@ -11,10 +11,13 @@ import {
   filterNavByRoles,
 } from "@/lib/nav/modules";
 import type { RoleName } from "@/lib/types/auth";
+import { TourReplayPanel } from "@/components/hrm/tutorials/TourReplayPanel";
 
 interface ModuleSidebarProps {
   config: ModuleConfig;
   userRoles: RoleName[];
+  extraVisibleHrefs?: string[];
+  showTours?: boolean;
   onNavigate?: () => void;
   onLogout?: () => void;
 }
@@ -22,11 +25,13 @@ interface ModuleSidebarProps {
 export function ModuleSidebar({
   config,
   userRoles,
+  extraVisibleHrefs = [],
+  showTours = false,
   onNavigate,
   onLogout,
 }: ModuleSidebarProps) {
   const pathname = usePathname();
-  const navItems = filterNavByRoles(config.navItems, userRoles);
+  const navItems = filterNavByRoles(config.navItems, userRoles, extraVisibleHrefs);
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-outline-variant bg-surface-container-low">
@@ -66,6 +71,7 @@ export function ModuleSidebar({
             <Link
               key={item.href}
               href={item.href}
+              data-tour={item.tourTarget}
               onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 px-4 py-3 text-body-md transition-colors duration-200",
@@ -93,6 +99,8 @@ export function ModuleSidebar({
           </Link>
         </div>
       ) : null}
+
+      {showTours ? <TourReplayPanel onNavigate={onNavigate} /> : null}
 
       {onLogout ? (
         <div className="border-t border-outline-variant p-4">

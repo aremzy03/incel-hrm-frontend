@@ -10,9 +10,10 @@ import {
   BarChart3,
   UserCircle,
   Building2,
+  Settings,
 } from "lucide-react";
 import type { RoleName } from "@/lib/types/auth";
-import { LOAN_APPROVER_ROLES } from "@/lib/rbac";
+import { LOAN_APPROVAL_NAV_ROLES } from "@/lib/rbac";
 
 export type ModuleId = "leave" | "loans" | "users" | "profile";
 
@@ -29,6 +30,8 @@ export interface SidebarNavItem {
   href: string;
   icon: React.ElementType;
   allowedRoles?: RoleName[];
+  /** `data-tour` target for guided module tours */
+  tourTarget?: string;
 }
 
 export interface ModuleConfig {
@@ -52,7 +55,7 @@ const LEAVE_APPROVER_ROLES: RoleName[] = [
 export const MODULE_TABS: ModuleTab[] = [
   { id: "dashboard", label: "Dashboard", href: "/dashboard", disabled: true },
   { id: "leave", label: "Leave Management", href: "/leave" },
-  { id: "loans", label: "Staff Loans", href: "/loans", comingSoon: true },
+  { id: "loans", label: "Staff Loans", href: "/loans" },
   { id: "users", label: "Users", href: "/users" },
   { id: "appraisals", label: "Appraisals", href: "/appraisals", comingSoon: true },
 ];
@@ -64,15 +67,30 @@ export const MODULE_CONFIGS: Record<ModuleId, ModuleConfig> = {
     cta: { label: "Request Leave", href: "/leave/apply" },
     navItems: [
       { label: "Leave Dashboard", href: "/leave", icon: LayoutDashboard },
-      { label: "Apply for Leave", href: "/leave/apply", icon: FilePlus },
-      { label: "Leave History", href: "/leave/history", icon: FileText },
+      {
+        label: "Apply for Leave",
+        href: "/leave/apply",
+        icon: FilePlus,
+        tourTarget: "leave-nav-apply",
+      },
+      {
+        label: "Leave History",
+        href: "/leave/history",
+        icon: FileText,
+        tourTarget: "leave-nav-history",
+      },
       {
         label: "Approvals",
         href: "/leave/admin",
         icon: CheckCircle,
         allowedRoles: LEAVE_APPROVER_ROLES,
       },
-      { label: "Leave Calendar", href: "/leave/calendar", icon: CalendarDays },
+      {
+        label: "Leave Calendar",
+        href: "/leave/calendar",
+        icon: CalendarDays,
+        tourTarget: "leave-nav-calendar",
+      },
       {
         label: "Public Holidays",
         href: "/leave/public-holidays",
@@ -99,12 +117,18 @@ export const MODULE_CONFIGS: Record<ModuleId, ModuleConfig> = {
         label: "Approvals",
         href: "/loans/admin",
         icon: CheckCircle,
-        allowedRoles: [...LOAN_APPROVER_ROLES],
+        allowedRoles: [...LOAN_APPROVAL_NAV_ROLES],
       },
       {
         label: "Reports",
         href: "/loans/reports",
         icon: BarChart3,
+        allowedRoles: ["HR"],
+      },
+      {
+        label: "Loan settings",
+        href: "/loans/settings",
+        icon: Settings,
         allowedRoles: ["HR"],
       },
     ],
@@ -161,9 +185,11 @@ export function isSidebarItemActive(pathname: string, href: string): boolean {
 
 export function filterNavByRoles(
   items: SidebarNavItem[],
-  userRoles: RoleName[]
+  userRoles: RoleName[],
+  extraVisibleHrefs: string[] = []
 ): SidebarNavItem[] {
   return items.filter((item) => {
+    if (extraVisibleHrefs.includes(item.href)) return true;
     if (!item.allowedRoles) return true;
     return item.allowedRoles.some((r) => userRoles.includes(r));
   });

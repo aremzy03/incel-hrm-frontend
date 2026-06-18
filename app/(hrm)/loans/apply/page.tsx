@@ -103,6 +103,7 @@ export default function ApplyForLoanPage() {
 
       {notConfirmed && (
         <div
+          data-tour="loans-confirmation-notice"
           className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
           role="alert"
         >
@@ -111,6 +112,15 @@ export default function ApplyForLoanPage() {
             Only confirmed staff can apply for loans. Your confirmation status
             must be updated by HR before you can proceed.
           </p>
+        </div>
+      )}
+
+      {!notConfirmed && personnel && (
+        <div
+          data-tour="loans-confirmation-notice"
+          className="max-w-xl rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
+        >
+          Confirmed staff can create draft loan applications here.
         </div>
       )}
 
@@ -123,7 +133,7 @@ export default function ApplyForLoanPage() {
           onSubmit={handleSubmit}
           className={cn(stitchCardClass, "max-w-xl space-y-5 p-6")}
         >
-          <div>
+          <div data-tour="loans-type-select">
             <label htmlFor="loan-type" className="mb-1.5 block text-sm font-medium">
               Loan type
             </label>
@@ -143,6 +153,7 @@ export default function ApplyForLoanPage() {
             </select>
           </div>
 
+          <div data-tour="loans-amount-tenure">
           <div>
             <label htmlFor="amount" className="mb-1.5 block text-sm font-medium">
               Amount (NGN)
@@ -176,8 +187,9 @@ export default function ApplyForLoanPage() {
             />
             <p className="mt-1 text-xs text-muted-foreground">1–12 months</p>
           </div>
+          </div>
 
-          <div>
+          <div data-tour="loans-purpose">
             <label htmlFor="purpose" className="mb-1.5 block text-sm font-medium">
               Purpose
             </label>

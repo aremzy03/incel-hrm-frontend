@@ -7,7 +7,6 @@ import {
   CheckCircle,
   Clock,
   Users,
-  Loader2,
   ArrowRight,
 } from "lucide-react";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
@@ -138,6 +137,7 @@ export default function LeaveDashboardPage() {
         title="Leave Management"
         subtitle="Track, apply, and manage leave across your organisation."
         action={
+          <span data-tour="leave-apply-btn">
           <Button
             nativeButton={false}
             render={<Link href="/leave/apply" />}
@@ -146,16 +146,28 @@ export default function LeaveDashboardPage() {
           >
             Apply for Leave
           </Button>
+          </span>
         }
       />
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-on-surface-variant" />
+        <div
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+          data-tour="leave-stats"
+        >
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-28 animate-pulse rounded-xl bg-surface-container-high"
+            />
+          ))}
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+            data-tour="leave-stats"
+          >
             <StatCard
               label="Annual Leave Balance"
               value={String(annualBalance?.remaining_days ?? 0)}
@@ -183,7 +195,9 @@ export default function LeaveDashboardPage() {
             />
           </div>
 
-          <LeaveBalanceStrip balances={balanceList} />
+          <div data-tour="leave-balance-strip">
+            <LeaveBalanceStrip balances={balanceList} />
+          </div>
 
           <DataTable
             columns={TABLE_COLUMNS}
