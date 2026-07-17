@@ -56,9 +56,9 @@ export const LEAVE_TOURS: TourDefinition[] = [
       {
         route: "/leave/apply",
         element: '[data-tour="leave-cover-person"]',
-        title: "Reliever (optional)",
+        title: "Reliever",
         description:
-          "Nominate a colleague in your department to cover your duties, or leave this blank if not needed.",
+          "Nominate an org-scoped colleague (team, unit, or department) to cover your duties. Required before submit for most leave types; optional when saving a draft.",
       },
       {
         route: "/leave/apply",

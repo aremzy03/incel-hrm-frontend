@@ -21,6 +21,7 @@ import {
   ApprovalChain,
   type ApprovalStep,
 } from "@/components/hrm/leave/ApprovalChain";
+import { EmployeeLeaveContext } from "@/components/hrm/leave/EmployeeLeaveContext";
 import {
   stitchCardClass,
   stitchFieldClass,
@@ -29,9 +30,19 @@ import {
 } from "@/lib/design/field-styles";
 import { apiGet, apiPost, apiPatch, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useDepartmentMembers } from "@/lib/api/departments";
+import { useEligibleRelievers } from "@/lib/api/leave";
 import { useLeaveTypes } from "@/lib/api/leave-types";
 import { canUserActOnLeaveRequest } from "@/lib/leave/approval";
+import {
+  extractCoverPersonId,
+  extractFieldError,
+  formatRelieverName,
+  isRelieverRequired,
+  isRelieverRequiredByPolicy,
+  shouldShowRelieverField,
+} from "@/lib/leave/reliever";
+import { FieldLabel } from "@/components/hrm/forms/FieldLabel";
+import { RelieverField } from "@/components/hrm/leave/RelieverField";
 import type {
   LeaveRequest,
   LeaveApprovalLog,
@@ -84,13 +95,6 @@ function buildApprovalSteps(status: LeaveStatus): ApprovalStep[] {
           ? ("active" as const)
           : ("upcoming" as const),
   }));
-}
-
-function extractCoverPersonId(
-  cp: LeaveRequest["cover_person"]
-): string {
-  if (!cp) return "";
-  return typeof cp === "string" ? cp : cp?.id ?? "";
 }
 
 function formatDate(dateStr: string) {
@@ -268,6 +272,7 @@ export default function LeaveRequestDetailPage({
     cover_person: string;
   } | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  const [coverPersonError, setCoverPersonError] = useState<string | null>(null);
   const [approvalModal, setApprovalModal] = useState<{
     action: ApprovalModalAction;
   } | null>(null);
@@ -289,12 +294,12 @@ export default function LeaveRequestDetailPage({
     [user?.department]
   );
   const { data: leaveTypes = [] } = useLeaveTypes();
-  const { data: departmentMembers = [] } = useDepartmentMembers(deptId ?? "");
-  const coverOptions = departmentMembers.filter((m) => m.id !== user?.id);
-
   const isOwnDraft =
     request?.status === "DRAFT" && request?.employee?.id === user?.id;
   const canEdit = !!request && isOwnDraft;
+
+  const { data: eligibleRelievers, isLoading: relieversLoading } =
+    useEligibleRelievers({ enabled: canEdit });
   const isOwner = !!request && request?.employee?.id === user?.id;
 
   const isPending = (request?.status as string | undefined)?.startsWith("PENDING");
@@ -313,24 +318,39 @@ export default function LeaveRequestDetailPage({
       request.status as LeaveStatus
     );
 
-  const submitMutation = useMutation({
-    mutationFn: (payload: LeaveRequestCreatePayload) =>
-      apiPost<LeaveRequest>(`leave-requests/${id}/submit/`, payload),
+  const saveAndSubmitMutation = useMutation({
+    mutationFn: async ({
+      patch,
+      submit,
+    }: {
+      patch?: Partial<LeaveRequestCreatePayload>;
+      submit: LeaveRequestCreatePayload;
+    }) => {
+      if (patch) {
+        await apiPatch<LeaveRequest>(`leave-requests/${id}`, patch);
+      }
+      return apiPost<LeaveRequest>(`leave-requests/${id}/submit/`, submit);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leave-request", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-request-logs", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
       setEditForm(null);
       setEditError(null);
+      setCoverPersonError(null);
     },
     onError: (err) => {
       if (err instanceof ApiError) {
         const d = err.data as Record<string, unknown>;
+        const coverErr = extractFieldError(d, "cover_person");
+        setCoverPersonError(coverErr);
         const msg =
+          coverErr ??
           (Array.isArray(d?.detail) ? d.detail[0] : d?.detail) ??
           (typeof d?.detail === "string" ? d.detail : null) ??
           err.message;
-        setEditError(msg as string);
+        setEditError(coverErr ? null : (msg as string));
       } else {
         setEditError("Something went wrong. Please try again.");
       }
@@ -344,15 +364,19 @@ export default function LeaveRequestDetailPage({
       queryClient.invalidateQueries({ queryKey: ["leave-request", id] });
       setEditForm(null);
       setEditError(null);
+      setCoverPersonError(null);
     },
     onError: (err) => {
       if (err instanceof ApiError) {
         const d = err.data as Record<string, unknown>;
+        const coverErr = extractFieldError(d, "cover_person");
+        setCoverPersonError(coverErr);
         const msg =
+          coverErr ??
           (Array.isArray(d?.detail) ? d.detail[0] : d?.detail) ??
           (typeof d?.detail === "string" ? d.detail : null) ??
           err.message;
-        setEditError(msg as string);
+        setEditError(coverErr ? null : (msg as string));
       } else {
         setEditError("Something went wrong. Please try again.");
       }
@@ -366,6 +390,7 @@ export default function LeaveRequestDetailPage({
       queryClient.invalidateQueries({ queryKey: ["leave-request", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-request-logs", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
       setApprovalModal(null);
       setEditError(null);
     },
@@ -381,6 +406,7 @@ export default function LeaveRequestDetailPage({
       queryClient.invalidateQueries({ queryKey: ["leave-request", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-request-logs", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
       setApprovalModal(null);
       setEditError(null);
     },
@@ -395,6 +421,7 @@ export default function LeaveRequestDetailPage({
       queryClient.invalidateQueries({ queryKey: ["leave-request", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-request-logs", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
       setEditError(null);
     },
     onError: (err) => {
@@ -455,12 +482,33 @@ export default function LeaveRequestDetailPage({
   };
   const formValues = editForm ?? baseForm;
 
+  const selectedLeaveType =
+    leaveTypes.find((t) => t.id === formValues.leave_type) ?? request.leave_type;
+  const relieverRequired = isRelieverRequired({
+    leaveTypeName: selectedLeaveType.name,
+    isEmergency: request.is_emergency,
+    user,
+  });
+  const showRelieverField = shouldShowRelieverField({
+    relieverRequired,
+    coverPersonId: formValues.cover_person,
+  });
+
   const canSubmit =
     canEdit &&
     formValues.leave_type &&
     formValues.start_date &&
     formValues.end_date &&
-    (deptId ? formValues.cover_person : true);
+    (!relieverRequired || !!formValues.cover_person);
+
+  const coverPersonDisplay =
+    request.cover_person && typeof request.cover_person === "object"
+      ? formatRelieverName(request.cover_person)
+      : null;
+  const relieverRequiredForDisplay = isRelieverRequiredByPolicy({
+    leaveTypeName: request.leave_type.name,
+    isEmergency: request.is_emergency,
+  });
 
   function handleStartEdit() {
     if (!request) return;
@@ -472,33 +520,48 @@ export default function LeaveRequestDetailPage({
       cover_person: extractCoverPersonId(request.cover_person),
     });
     setEditError(null);
+    setCoverPersonError(null);
   }
 
   function handleSaveEdits() {
     if (!editForm || !request) return;
     setEditError(null);
+    setCoverPersonError(null);
     updateMutation.mutate({
       leave_type: editForm.leave_type,
       start_date: editForm.start_date,
       end_date: editForm.end_date,
       reason: editForm.reason,
       is_emergency: request.is_emergency,
-      cover_person: editForm.cover_person,
+      ...(editForm.cover_person
+        ? { cover_person: editForm.cover_person }
+        : {}),
     });
+  }
+
+  function buildDraftPayload(
+    values: typeof baseForm,
+    isEmergency: boolean
+  ): LeaveRequestCreatePayload {
+    return {
+      leave_type: values.leave_type,
+      start_date: values.start_date,
+      end_date: values.end_date,
+      reason: values.reason,
+      is_emergency: isEmergency,
+      ...(values.cover_person ? { cover_person: values.cover_person } : {}),
+    };
   }
 
   function handleSubmitDraft() {
     if (!request) return;
     setEditError(null);
-    const payload: LeaveRequestCreatePayload = {
-      leave_type: formValues.leave_type,
-      start_date: formValues.start_date,
-      end_date: formValues.end_date,
-      reason: formValues.reason,
-      is_emergency: request.is_emergency,
-      cover_person: formValues.cover_person || "",
-    };
-    submitMutation.mutate(payload);
+    setCoverPersonError(null);
+    const payload = buildDraftPayload(formValues, request.is_emergency);
+    saveAndSubmitMutation.mutate({
+      submit: payload,
+      patch: editForm ? payload : undefined,
+    });
   }
 
   return (
@@ -570,10 +633,10 @@ export default function LeaveRequestDetailPage({
               </button>
               <button
                 onClick={handleSubmitDraft}
-                disabled={!canSubmit || submitMutation.isPending}
+                disabled={!canSubmit || saveAndSubmitMutation.isPending}
                 className="flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {submitMutation.isPending && (
+                {saveAndSubmitMutation.isPending && (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 )}
                 Submit for approval
@@ -616,14 +679,30 @@ export default function LeaveRequestDetailPage({
             {editForm ? (
               <div className="space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-foreground">
+                  <FieldLabel htmlFor={`leave-edit-type-${id}`}>
                     Leave Type
-                  </label>
+                  </FieldLabel>
                   <select
+                    id={`leave-edit-type-${id}`}
                     value={editForm.leave_type}
-                    onChange={(e) =>
-                      setEditForm((f) => f && { ...f, leave_type: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      const nextType = leaveTypes.find((t) => t.id === nextId);
+                      setEditForm((f) => {
+                        if (!f) return null;
+                        const nextRelieverRequired = isRelieverRequired({
+                          leaveTypeName: nextType?.name ?? request.leave_type.name,
+                          isEmergency: request.is_emergency,
+                          user,
+                        });
+                        return {
+                          ...f,
+                          leave_type: nextId,
+                          cover_person: nextRelieverRequired ? f.cover_person : "",
+                        };
+                      });
+                      setCoverPersonError(null);
+                    }}
                     className={stitchSelectClass}
                   >
                     {leaveTypes.map((t) => (
@@ -633,35 +712,37 @@ export default function LeaveRequestDetailPage({
                     ))}
                   </select>
                 </div>
-                {deptId && (
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-foreground">
-                      Reliever
-                    </label>
-                    <select
-                      value={editForm.cover_person}
-                      onChange={(e) =>
-                        setEditForm((f) =>
-                          f ? { ...f, cover_person: e.target.value } : null
-                        )
-                      }
-                      className={stitchSelectClass}
-                    >
-                      <option value="">Select reliever</option>
-                      {coverOptions.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.full_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+
+                {deptId ? (
+                  <RelieverField
+                    id={`leave-edit-cover-${id}`}
+                    value={editForm.cover_person}
+                    onChange={(next) => {
+                      setEditForm((f) =>
+                        f ? { ...f, cover_person: next } : null
+                      );
+                      setCoverPersonError(null);
+                    }}
+                    relieverRequired={relieverRequired}
+                    showField={showRelieverField}
+                    relievers={eligibleRelievers?.relievers ?? []}
+                    eligibleData={eligibleRelievers}
+                    isLoading={relieversLoading}
+                    error={coverPersonError}
+                  />
+                ) : (
+                  <p className="text-body-md text-on-surface-variant">
+                    Reliever selection requires an org assignment. Contact HR if
+                    this looks wrong.
+                  </p>
                 )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-foreground">
+                    <FieldLabel htmlFor={`leave-edit-start-${id}`}>
                       Start Date
-                    </label>
+                    </FieldLabel>
                     <input
+                      id={`leave-edit-start-${id}`}
                       type="date"
                       value={editForm.start_date}
                       onChange={(e) =>
@@ -673,10 +754,11 @@ export default function LeaveRequestDetailPage({
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-foreground">
+                    <FieldLabel htmlFor={`leave-edit-end-${id}`}>
                       End Date
-                    </label>
+                    </FieldLabel>
                     <input
+                      id={`leave-edit-end-${id}`}
                       type="date"
                       value={editForm.end_date}
                       min={editForm.start_date}
@@ -690,10 +772,11 @@ export default function LeaveRequestDetailPage({
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-foreground">
+                  <FieldLabel htmlFor={`leave-edit-reason-${id}`} optional>
                     Reason
-                  </label>
+                  </FieldLabel>
                   <textarea
+                    id={`leave-edit-reason-${id}`}
                     rows={3}
                     value={editForm.reason}
                     onChange={(e) =>
@@ -716,7 +799,9 @@ export default function LeaveRequestDetailPage({
                   <button
                     type="button"
                     onClick={handleSaveEdits}
-                    disabled={updateMutation.isPending}
+                    disabled={
+                      updateMutation.isPending || saveAndSubmitMutation.isPending
+                    }
                     className="flex items-center gap-2 rounded-lg border border-primary bg-primary/5 px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary/10 disabled:opacity-50"
                   >
                     {updateMutation.isPending && (
@@ -727,10 +812,10 @@ export default function LeaveRequestDetailPage({
                   <button
                     type="button"
                     onClick={handleSubmitDraft}
-                    disabled={!canSubmit || submitMutation.isPending}
+                    disabled={!canSubmit || saveAndSubmitMutation.isPending}
                     className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {submitMutation.isPending && (
+                    {saveAndSubmitMutation.isPending && (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     )}
                     Submit for approval
@@ -759,6 +844,17 @@ export default function LeaveRequestDetailPage({
                   <dt className="text-xs text-muted-foreground">Leave Type</dt>
                   <dd className="text-sm font-medium text-foreground">
                     {request.leave_type.name}
+                  </dd>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <User className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <dt className="text-xs text-muted-foreground">Reliever</dt>
+                  <dd className="text-sm font-medium text-foreground">
+                    {coverPersonDisplay ??
+                      (!relieverRequiredForDisplay ? "Not required" : "—")}
                   </dd>
                 </div>
               </div>
@@ -809,6 +905,14 @@ export default function LeaveRequestDetailPage({
             </>
             )}
           </div>
+
+          <EmployeeLeaveContext
+            employeeId={request.employee.id}
+            employeeName={employeeName}
+            currentRequestId={id}
+            viewer={user}
+            isOwner={isOwner}
+          />
         </div>
 
         <div className="space-y-4">

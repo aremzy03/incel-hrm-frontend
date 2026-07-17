@@ -11,15 +11,22 @@ import type { ApprovalStep } from "@/components/hrm/leave/ApprovalChain";
 import { ApprovalChain } from "@/components/hrm/leave/ApprovalChain";
 import { LeaveBalancePanel } from "@/components/hrm/leave/LeaveBalancePanel";
 import { PolicyNotice } from "@/components/hrm/leave/PolicyNotice";
+import { RelieverField } from "@/components/hrm/leave/RelieverField";
+import { FieldLabel } from "@/components/hrm/forms/FieldLabel";
 import {
   stitchCardClass,
   stitchSelectClass,
   stitchTextareaClass,
 } from "@/lib/design/field-styles";
 import { apiGet, apiPost, ApiError } from "@/lib/api-client";
-import { useDepartmentMembers } from "@/lib/api/departments";
+import { useEligibleRelievers } from "@/lib/api/leave";
 import { useLeaveTypes } from "@/lib/api/leave-types";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  extractFieldError,
+  isRelieverRequired,
+  shouldShowRelieverField,
+} from "@/lib/leave/reliever";
 import { HolidayDatePicker } from "@/components/hrm/leave/HolidayDatePicker";
 import { listPublicHolidays } from "@/lib/api/public-holidays";
 import { buildHolidayLookup, countWorkingDaysPreview, toYmd } from "@/lib/public-holidays/utils";
@@ -51,6 +58,8 @@ const VALIDATION_FIELDS = [
 
 function getValidationMessage(data: Record<string, unknown> | undefined): string {
   if (!data) return "";
+  const coverPerson = extractFieldError(data, "cover_person");
+  if (coverPerson) return coverPerson;
   const extract = (v: unknown): string | null => {
     if (typeof v === "string") return v;
     if (Array.isArray(v) && v.length > 0 && typeof v[0] === "string") return v[0];
@@ -134,30 +143,6 @@ function isAnnualOrCasual(name: string): boolean {
   return n.includes("annual") || n.includes("casual");
 }
 
-function FieldLabel({
-  htmlFor,
-  children,
-  optional,
-}: {
-  htmlFor: string;
-  children: React.ReactNode;
-  optional?: boolean;
-}) {
-  return (
-    <label
-      htmlFor={htmlFor}
-      className="mb-1.5 block text-label-md text-on-surface-variant"
-    >
-      {children}
-      {optional && (
-        <span className="ml-1 text-xs font-normal text-muted-foreground">
-          (optional)
-        </span>
-      )}
-    </label>
-  );
-}
-
 export default function ApplyLeavePage() {
   const formId = useId();
   const queryClient = useQueryClient();
@@ -171,6 +156,7 @@ export default function ApplyLeavePage() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [coverPersonError, setCoverPersonError] = useState<string | null>(null);
   const [overlapConfirmOpen, setOverlapConfirmOpen] = useState(false);
 
   const minStartDate = useMemo(() => {
@@ -191,7 +177,8 @@ export default function ApplyLeavePage() {
       : user?.department?.id ?? null;
 
   const { data: leaveTypesRaw, isLoading: typesLoading } = useLeaveTypes();
-  const { data: departmentMembers = [] } = useDepartmentMembers(deptId ?? "");
+  const { data: eligibleRelievers, isLoading: relieversLoading } =
+    useEligibleRelievers({ enabled: !!user });
 
   const currentYear = new Date().getFullYear();
   const { data: myRequestsRaw } = useQuery({
@@ -212,13 +199,20 @@ export default function ApplyLeavePage() {
     isLeaveTypeEligible(t.name, user?.gender)
   );
 
-  const coverOptions = departmentMembers.filter((m) => m.id !== user?.id);
-
   const myRequests: LeaveRequest[] = Array.isArray(myRequestsRaw)
     ? myRequestsRaw
     : myRequestsRaw?.results ?? [];
 
   const selectedLeaveType = leaveTypes.find((t) => t.id === leaveTypeId);
+  const relieverRequired = isRelieverRequired({
+    leaveTypeName: selectedLeaveType?.name ?? "",
+    isEmergency: false,
+    user,
+  });
+  const showRelieverField = shouldShowRelieverField({
+    relieverRequired,
+    coverPersonId,
+  });
   const showAnnualCasualHint =
     selectedLeaveType && isAnnualOrCasual(selectedLeaveType.name);
 
@@ -269,13 +263,14 @@ export default function ApplyLeavePage() {
       : 0;
 
   const noDepartment = !deptId;
-  const noCoverOptions = deptId && coverOptions.length === 0;
-  const canSubmit =
+  const baseFieldsValid =
     !noDepartment &&
     leaveTypeId !== "" &&
     startDate !== "" &&
     endDate !== "";
-  const canSaveDraft = canSubmit;
+  const canSubmit =
+    baseFieldsValid && (!relieverRequired || !!coverPersonId);
+  const canSaveDraft = baseFieldsValid;
 
   const createDraftMutation = useMutation({
     mutationFn: async (payload: LeaveRequestCreatePayload) => {
@@ -293,8 +288,11 @@ export default function ApplyLeavePage() {
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const msg = getValidationMessage(err.data as Record<string, unknown>);
-        setApiError(msg || err.message);
+        const data = err.data as Record<string, unknown>;
+        const coverErr = extractFieldError(data, "cover_person");
+        setCoverPersonError(coverErr);
+        const msg = getValidationMessage(data);
+        setApiError(coverErr ? null : msg || err.message);
       } else {
         setApiError("Something went wrong. Please try again.");
       }
@@ -316,8 +314,11 @@ export default function ApplyLeavePage() {
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        const msg = getValidationMessage(err.data as Record<string, unknown>);
-        setApiError(msg || err.message);
+        const data = err.data as Record<string, unknown>;
+        const coverErr = extractFieldError(data, "cover_person");
+        setCoverPersonError(coverErr);
+        const msg = getValidationMessage(data);
+        setApiError(coverErr ? null : msg || err.message);
       } else {
         setApiError("Something went wrong. Please try again.");
       }
@@ -340,11 +341,13 @@ export default function ApplyLeavePage() {
 
   function doSaveDraft() {
     setApiError(null);
+    setCoverPersonError(null);
     createDraftMutation.mutate(payload);
   }
 
   function doSubmit() {
     setApiError(null);
+    setCoverPersonError(null);
     createAndSubmitMutation.mutate(payload);
   }
 
@@ -428,7 +431,21 @@ export default function ApplyLeavePage() {
                   <select
                     id={`${formId}-type`}
                     value={leaveTypeId}
-                    onChange={(e) => setLeaveTypeId(e.target.value)}
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      setLeaveTypeId(nextId);
+                      const nextType = leaveTypes.find((t) => t.id === nextId);
+                      if (
+                        !isRelieverRequired({
+                          leaveTypeName: nextType?.name ?? "",
+                          isEmergency: false,
+                          user,
+                        })
+                      ) {
+                        setCoverPersonId("");
+                        setCoverPersonError(null);
+                      }
+                    }}
                     className={stitchSelectClass}
                     required
                   >
@@ -444,8 +461,8 @@ export default function ApplyLeavePage() {
                 )}
                 {showAnnualCasualHint && (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Only one person per department can have overlapping Annual or
-                    Casual leave.{" "}
+                    Only one person per team, unit, or department can have
+                    overlapping Annual or Casual leave.{" "}
                     <Link
                       href="/leave/calendar"
                       className="text-primary hover:underline"
@@ -456,38 +473,27 @@ export default function ApplyLeavePage() {
                 )}
               </div>
 
-              <div data-tour="leave-cover-person">
-                {deptId ? (
-                  <>
-                    <FieldLabel htmlFor={`${formId}-cover`} optional>
-                      Reliever
-                    </FieldLabel>
-                    <select
-                      id={`${formId}-cover`}
-                      value={coverPersonId}
-                      onChange={(e) => setCoverPersonId(e.target.value)}
-                      className={stitchSelectClass}
-                      disabled={coverOptions.length === 0}
-                    >
-                      <option value="">
-                        {coverOptions.length === 0
-                          ? "No relievers available"
-                          : "None"}
-                      </option>
-                      {coverOptions.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.full_name}
-                        </option>
-                      ))}
-                    </select>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Reliever selection is available once you are assigned to a
-                    department.
-                  </p>
-                )}
-              </div>
+              {noDepartment ? (
+                <p className="text-body-md text-on-surface-variant">
+                  Reliever selection requires an org assignment. Contact HR if
+                  this looks wrong.
+                </p>
+              ) : (
+                <RelieverField
+                  id={`${formId}-cover`}
+                  value={coverPersonId}
+                  onChange={(next) => {
+                    setCoverPersonId(next);
+                    setCoverPersonError(null);
+                  }}
+                  relieverRequired={relieverRequired}
+                  showField={showRelieverField}
+                  relievers={eligibleRelievers?.relievers ?? []}
+                  eligibleData={eligibleRelievers}
+                  isLoading={relieversLoading}
+                  error={coverPersonError}
+                />
+              )}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" data-tour="leave-date-range">
                 <div>

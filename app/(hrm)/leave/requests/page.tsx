@@ -1,22 +1,20 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Suspense, useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, X, Loader2, Eye, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/hrm/ui/StatusBadge";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
 import { DataTable } from "@/components/hrm/ui/DataTable";
-import { apiGet } from "@/lib/api-client";
+import { useLeaveRequestsPage } from "@/lib/api/leave";
+import { useLeaveTypes } from "@/lib/api/leave-types";
 import { LEAVE_STATUS_DISPLAY } from "@/lib/types/leave";
-import type {
-  LeaveRequest,
-  LeaveStatus,
-  PaginatedResponse,
-} from "@/lib/types/leave";
+import type { LeaveStatus } from "@/lib/types/leave";
 
-const PAGE_SIZE = 10;
+/** Matches backend DRF PageNumberPagination PAGE_SIZE default. */
+const PAGE_SIZE = 20;
 
 const ALL_STATUSES: LeaveStatus[] = [
   "DRAFT",
@@ -44,47 +42,63 @@ const TABLE_COLUMNS = [
 const selectClass =
   "rounded-lg border border-border bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
-export default function LeaveRequestsDirectoryPage() {
-  const { data: requestsRaw, isLoading } = useQuery({
-    queryKey: ["leave-requests"],
-    queryFn: () =>
-      apiGet<PaginatedResponse<LeaveRequest> | LeaveRequest[]>("leave-requests"),
-  });
-
-  const records: LeaveRequest[] = Array.isArray(requestsRaw)
-    ? requestsRaw
-    : requestsRaw?.results ?? [];
+function LeaveRequestsDirectoryContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const employeeParam = searchParams.get("employee");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | string>("all");
   const [page, setPage] = useState(1);
 
-  const leaveTypeNames = useMemo(() => {
-    const names = new Set(records.map((r) => r.leave_type.name));
-    return Array.from(names).sort();
-  }, [records]);
+  const { data: requestsPage, isLoading, isFetching } = useLeaveRequestsPage({
+    employee: employeeParam ?? undefined,
+    status: statusFilter === "all" ? undefined : statusFilter,
+    leave_type: typeFilter === "all" ? undefined : typeFilter,
+    page,
+  });
 
-  const filtered = useMemo(() => {
+  const { data: leaveTypes = [] } = useLeaveTypes();
+
+  const records = requestsPage?.results ?? [];
+  const total = requestsPage?.count ?? 0;
+  const canPrev = !!requestsPage?.previous && page > 1;
+  const canNext = !!requestsPage?.next;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const employeeFilterLabel = useMemo(() => {
+    if (!employeeParam || records.length === 0) return null;
+    const match = records.find((r) => r.employee.id === employeeParam);
+    if (!match) return null;
+    return `${match.employee.first_name} ${match.employee.last_name}`;
+  }, [employeeParam, records]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [employeeParam, statusFilter, typeFilter]);
+
+  useEffect(() => {
+    if (total === 0) return;
+    const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (page > maxPage) setPage(maxPage);
+  }, [total, page]);
+
+  // Search is not supported by the list API; filter the current page only.
+  const pageRecords = useMemo(() => {
     const q = search.trim().toLowerCase();
+    if (!q) return records;
     return records.filter((r) => {
       const fullName =
         `${r.employee.first_name} ${r.employee.last_name}`.toLowerCase();
       const email = (r.employee.email ?? "").toLowerCase();
-      const nameMatch =
-        !q || fullName.includes(q) || email.includes(q);
-      const statusMatch = statusFilter === "all" || r.status === statusFilter;
-      const typeMatch = typeFilter === "all" || r.leave_type.name === typeFilter;
-      return nameMatch && statusMatch && typeMatch;
+      return fullName.includes(q) || email.includes(q);
     });
-  }, [records, search, statusFilter, typeFilter]);
+  }, [records, search]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const pageRecords = filtered.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE
-  );
+  const rangeStart =
+    total === 0 ? 0 : Math.min((page - 1) * PAGE_SIZE + 1, total);
+  const rangeEnd = Math.min(page * PAGE_SIZE, total);
 
   return (
     <div className="mx-auto max-w-7xl space-y-8">
@@ -98,28 +112,45 @@ export default function LeaveRequestsDirectoryPage() {
 
       <PageHeader
         title="Leave Requests"
-        subtitle="All leave requests across the organisation. Open a record for full details."
+        subtitle={
+          employeeFilterLabel
+            ? `Showing requests for ${employeeFilterLabel}.`
+            : "All leave requests across the organisation. Open a record for full details."
+        }
       />
+
+      {employeeParam && (
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-4 py-2 text-sm">
+          <span className="text-muted-foreground">
+            Filtered by employee
+            {employeeFilterLabel ? `: ${employeeFilterLabel}` : ""}
+          </span>
+          <Link
+            href="/leave/requests"
+            className="ml-auto inline-flex items-center gap-1 font-medium text-primary hover:underline"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden />
+            Clear employee filter
+          </Link>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div>
+        <div className={cn(isFetching && "opacity-70 transition-opacity")}>
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="search"
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-                placeholder="Search by name or email…"
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search this page by name or email…"
                 className={cn(selectClass, "w-full pl-9")}
-                aria-label="Search employees"
+                aria-label="Search employees on this page"
               />
             </div>
 
@@ -143,23 +174,21 @@ export default function LeaveRequestsDirectoryPage() {
             <select
               value={typeFilter}
               className={selectClass}
-              onChange={(e) => {
-                setTypeFilter(e.target.value);
-                setPage(1);
-              }}
+              onChange={(e) => setTypeFilter(e.target.value)}
               aria-label="Filter by leave type"
             >
               <option value="all">All Types</option>
-              {leaveTypeNames.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {leaveTypes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
                 </option>
               ))}
             </select>
 
             {(search.trim() !== "" ||
               statusFilter !== "all" ||
-              typeFilter !== "all") && (
+              typeFilter !== "all" ||
+              !!employeeParam) && (
               <button
                 type="button"
                 onClick={() => {
@@ -167,6 +196,9 @@ export default function LeaveRequestsDirectoryPage() {
                   setStatusFilter("all");
                   setTypeFilter("all");
                   setPage(1);
+                  if (employeeParam) {
+                    router.push("/leave/requests");
+                  }
                 }}
                 className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:bg-muted"
               >
@@ -216,19 +248,21 @@ export default function LeaveRequestsDirectoryPage() {
             }))}
           />
 
-          {totalPages > 1 && (
+          {total > 0 && (
             <div className="mt-1 flex items-center justify-between rounded-xl border border-border bg-card px-5 py-3">
               <p className="text-sm text-muted-foreground">
-                Showing{" "}
-                {Math.min((safePage - 1) * PAGE_SIZE + 1, filtered.length)}
-                &ndash;
-                {Math.min(safePage * PAGE_SIZE, filtered.length)} of{" "}
-                {filtered.length} records
+                Showing {rangeStart}&ndash;{rangeEnd} of {total} records
+                {totalPages > 1 ? (
+                  <>
+                    {" "}
+                    (page {page} of {totalPages})
+                  </>
+                ) : null}
               </p>
               <nav className="flex items-center gap-1" aria-label="Pagination">
                 <button
                   type="button"
-                  disabled={safePage === 1}
+                  disabled={!canPrev}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label="Previous page"
@@ -236,26 +270,44 @@ export default function LeaveRequestsDirectoryPage() {
                   <ChevronLeft className="h-4 w-4" />
                   Previous
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                  <button
-                    type="button"
-                    key={n}
-                    onClick={() => setPage(n)}
-                    aria-current={n === safePage ? "page" : undefined}
-                    className={cn(
-                      "rounded-md px-2.5 py-1 text-sm transition",
-                      n === safePage
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted"
-                    )}
-                  >
-                    {n}
-                  </button>
-                ))}
+                {totalPages > 1 &&
+                  Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((n) => {
+                      // Keep the page button strip usable for large totals.
+                      if (totalPages <= 7) return true;
+                      if (n === 1 || n === totalPages) return true;
+                      return Math.abs(n - page) <= 2;
+                    })
+                    .map((n, idx, arr) => {
+                      const prev = arr[idx - 1];
+                      const showEllipsis = prev !== undefined && n - prev > 1;
+                      return (
+                        <span key={n} className="contents">
+                          {showEllipsis && (
+                            <span className="px-1 text-sm text-muted-foreground">
+                              …
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setPage(n)}
+                            aria-current={n === page ? "page" : undefined}
+                            className={cn(
+                              "rounded-md px-2.5 py-1 text-sm transition",
+                              n === page
+                                ? "bg-primary text-primary-foreground"
+                                : "text-muted-foreground hover:bg-muted"
+                            )}
+                          >
+                            {n}
+                          </button>
+                        </span>
+                      );
+                    })}
                 <button
                   type="button"
-                  disabled={safePage === totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={!canNext}
+                  onClick={() => setPage((p) => p + 1)}
                   className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label="Next page"
                 >
@@ -268,5 +320,19 @@ export default function LeaveRequestsDirectoryPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LeaveRequestsDirectoryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <LeaveRequestsDirectoryContent />
+    </Suspense>
   );
 }

@@ -62,7 +62,14 @@ export interface LeaveRequest {
   created_at: string;
   updated_at: string;
   /** Present when backend includes it (e.g. for DRAFT) */
-  cover_person?: string | { id: string };
+  cover_person?: EmployeeMinimal | null;
+}
+
+export interface EligibleRelieversResponse {
+  scope_level: "team" | "unit" | "department" | null;
+  effective_scope_level: "team" | "unit" | "department" | null;
+  fallback_applied: boolean;
+  relievers: EmployeeMinimal[];
 }
 
 export interface LeaveApprovalLog {
