@@ -143,6 +143,23 @@ function isAnnualOrCasual(name: string): boolean {
   return n.includes("annual") || n.includes("casual");
 }
 
+function isSickLeave(name: string): boolean {
+  return name.toLowerCase().includes("sick");
+}
+
+function todayYmd(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return toYmd(d);
+}
+
+function tomorrowYmd(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 1);
+  return toYmd(d);
+}
+
 export default function ApplyLeavePage() {
   const formId = useId();
   const queryClient = useQueryClient();
@@ -153,23 +170,10 @@ export default function ApplyLeavePage() {
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
   const [coverPersonId, setCoverPersonId] = useState("");
-  const [fileName, setFileName] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [coverPersonError, setCoverPersonError] = useState<string | null>(null);
   const [overlapConfirmOpen, setOverlapConfirmOpen] = useState(false);
-
-  const minStartDate = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + 1);
-    return toYmd(d);
-  }, []);
-
-  const minEndDate = useMemo(() => {
-    if (startDate) return startDate;
-    return minStartDate;
-  }, [minStartDate, startDate]);
 
   const deptId =
     typeof user?.department === "string"
@@ -204,6 +208,11 @@ export default function ApplyLeavePage() {
     : myRequestsRaw?.results ?? [];
 
   const selectedLeaveType = leaveTypes.find((t) => t.id === leaveTypeId);
+  const allowsSameDayLeave = Boolean(
+    selectedLeaveType && isSickLeave(selectedLeaveType.name)
+  );
+  const minStartDate = allowsSameDayLeave ? todayYmd() : tomorrowYmd();
+  const minEndDate = startDate || minStartDate;
   const relieverRequired = isRelieverRequired({
     leaveTypeName: selectedLeaveType?.name ?? "",
     isEmergency: false,
@@ -325,11 +334,6 @@ export default function ApplyLeavePage() {
     },
   });
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    setFileName(file ? file.name : null);
-  }
-
   const payload: LeaveRequestCreatePayload = {
     leave_type: leaveTypeId,
     start_date: startDate,
@@ -445,6 +449,14 @@ export default function ApplyLeavePage() {
                         setCoverPersonId("");
                         setCoverPersonError(null);
                       }
+                      // Same-day start is only allowed for sick leave
+                      const nextMin = nextType && isSickLeave(nextType.name)
+                        ? todayYmd()
+                        : tomorrowYmd();
+                      if (startDate && startDate < nextMin) {
+                        setStartDate("");
+                        setEndDate("");
+                      }
                     }}
                     className={stitchSelectClass}
                     required
@@ -525,6 +537,12 @@ export default function ApplyLeavePage() {
                     disableWeekendsAndHolidays
                   />
                 </div>
+                {allowsSameDayLeave && (
+                  <p className="sm:col-span-2 text-xs text-muted-foreground">
+                    Sick leave can start today. Other leave types require at
+                    least one day&apos;s notice.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -564,33 +582,27 @@ export default function ApplyLeavePage() {
                 />
               </div>
 
-              <div>
+              <div aria-disabled="true" className="relative select-none">
                 <FieldLabel htmlFor={`${formId}-file`} optional>
                   Attach Document
                 </FieldLabel>
-                <label
-                  htmlFor={`${formId}-file`}
-                  className={cn(
-                    "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-lowest p-6 text-center text-body-md text-on-surface-variant transition hover:border-primary-container hover:bg-surface-container-low",
-                    fileName && "border-primary-container/50 bg-secondary-container/30"
-                  )}
+                <div
+                  className="pointer-events-none flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-lowest p-6 text-center text-body-md text-on-surface-variant blur-[1.5px] opacity-50"
+                  aria-hidden="true"
                 >
                   <Paperclip className="h-4 w-4" />
-                  {fileName ? (
-                    <span className="font-medium text-foreground">
-                      {fileName}
-                    </span>
-                  ) : (
-                    "Attach supporting document (optional)"
-                  )}
-                  <input
-                    id={`${formId}-file`}
-                    type="file"
-                    className="sr-only"
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                    onChange={handleFileChange}
-                  />
-                </label>
+                  Attach supporting document (optional)
+                </div>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Document upload is not available yet.
+                </p>
+                <input
+                  id={`${formId}-file`}
+                  type="file"
+                  className="sr-only"
+                  disabled
+                  tabIndex={-1}
+                />
               </div>
 
               <div data-tour="leave-submit-actions">
