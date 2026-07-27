@@ -1,8 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "@/lib/api-client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api-client";
 import type {
+  BulkReconcilePayload,
+  BulkReconcileResponse,
   EligibleRelieversResponse,
   LeaveBalance,
+  LeaveReconcileEditPayload,
+  LeaveReconcilePayload,
   LeaveRequest,
   PaginatedResponse,
 } from "@/lib/types/leave";
@@ -17,6 +21,7 @@ export interface LeaveRequestListParams {
   leave_type?: string;
   exclude?: string;
   page?: number;
+  is_reconciled?: boolean;
 }
 
 export interface LeaveBalanceListParams {
@@ -81,6 +86,12 @@ export function useLeaveRequests(
         status: params?.status,
         leave_type: params?.leave_type,
         exclude: params?.exclude,
+        is_reconciled:
+          params?.is_reconciled === true
+            ? "true"
+            : params?.is_reconciled === false
+              ? "false"
+              : undefined,
         page: params?.page && params.page > 1 ? params.page : undefined,
       });
       const data = await apiGet<PaginatedResponse<LeaveRequest> | LeaveRequest[]>(
@@ -106,6 +117,12 @@ export function useLeaveRequestsPage(
         status: params?.status,
         leave_type: params?.leave_type,
         exclude: params?.exclude,
+        is_reconciled:
+          params?.is_reconciled === true
+            ? "true"
+            : params?.is_reconciled === false
+              ? "false"
+              : undefined,
         page: page > 1 ? page : undefined,
       });
       const data = await apiGet<PaginatedResponse<LeaveRequest> | LeaveRequest[]>(
@@ -161,6 +178,126 @@ export function useLeaveBalances(
         return false;
       }
       return failureCount < 2;
+    },
+  });
+}
+
+/** Paginated list of HR-reconciled leave requests. */
+export function useReconciledLeaveRequestsPage(
+  params?: Omit<LeaveRequestListParams, "is_reconciled">,
+  options?: { enabled?: boolean }
+) {
+  return useLeaveRequestsPage({ ...params, is_reconciled: true }, options);
+}
+
+// ---------------------------------------------------------------------------
+// Reconciliation mutations
+// ---------------------------------------------------------------------------
+
+export async function reconcileLeaveRequest(payload: LeaveReconcilePayload) {
+  return apiPost<LeaveRequest>("leave-requests/reconcile/", payload);
+}
+
+export async function bulkReconcileLeave(payload: BulkReconcilePayload) {
+  const res = await fetch("/api/proxy/leave-requests/bulk-reconcile/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    data = { detail: res.statusText || "Bulk reconcile failed." };
+  }
+
+  if (!res.ok && res.status !== 207) {
+    throw new ApiError(res.status, data);
+  }
+
+  return data as BulkReconcileResponse;
+}
+
+export async function bulkReconcileLeaveCsv(formData: FormData) {
+  const res = await fetch("/api/proxy/leave-requests/bulk-reconcile-csv/", {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    data = { detail: res.statusText || "CSV upload failed." };
+  }
+
+  if (!res.ok && res.status !== 207) {
+    throw new ApiError(res.status, data);
+  }
+
+  return data as BulkReconcileResponse;
+}
+
+export async function editReconciledLeave(
+  id: string,
+  payload: LeaveReconcileEditPayload
+) {
+  return apiPatch<LeaveRequest>(`leave-requests/${id}/`, payload);
+}
+
+export async function cancelLeaveRequest(id: string, comment?: string) {
+  return apiPost<LeaveRequest>(
+    `leave-requests/${id}/cancel/`,
+    comment ? { comment } : undefined
+  );
+}
+
+export function useReconcileLeaveRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: reconcileLeaveRequest,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leave-requests"] });
+      qc.invalidateQueries({ queryKey: ["leave-balances"] });
+    },
+  });
+}
+
+export function useBulkReconcileLeave() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: bulkReconcileLeave,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leave-requests"] });
+      qc.invalidateQueries({ queryKey: ["leave-balances"] });
+    },
+  });
+}
+
+export function useBulkReconcileLeaveCsv() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: bulkReconcileLeaveCsv,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leave-requests"] });
+      qc.invalidateQueries({ queryKey: ["leave-balances"] });
+    },
+  });
+}
+
+export function useEditReconciledLeave(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: LeaveReconcileEditPayload) =>
+      editReconciledLeave(id, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leave-request", id] });
+      qc.invalidateQueries({ queryKey: ["leave-request-logs", id] });
+      qc.invalidateQueries({ queryKey: ["leave-requests"] });
+      qc.invalidateQueries({ queryKey: ["leave-balances"] });
     },
   });
 }

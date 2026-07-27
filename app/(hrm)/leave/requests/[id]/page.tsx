@@ -14,6 +14,8 @@ import {
   X,
   XCircle,
   Loader2,
+  FileCheck,
+  Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/hrm/ui/StatusBadge";
@@ -30,9 +32,13 @@ import {
 } from "@/lib/design/field-styles";
 import { apiGet, apiPost, apiPatch, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEligibleRelievers } from "@/lib/api/leave";
+import { useEligibleRelievers, cancelLeaveRequest, useEditReconciledLeave } from "@/lib/api/leave";
 import { useLeaveTypes } from "@/lib/api/leave-types";
 import { canUserActOnLeaveRequest } from "@/lib/leave/approval";
+import { isReconciledRequest } from "@/lib/leave/reconciliation";
+import { hasRole } from "@/lib/rbac";
+import { UserSearchField } from "@/components/hrm/leave/UserSearchField";
+import { ReconciledBanner, ReconciledBadge } from "@/components/hrm/leave/ReconciledBadge";
 import {
   extractCoverPersonId,
   extractFieldError,
@@ -48,6 +54,7 @@ import type {
   LeaveApprovalLog,
   LeaveRequestCreatePayload,
   LeaveStatus,
+  LeaveReconcileEditPayload,
 } from "@/lib/types/leave";
 
 const APPROVAL_STEP_LABELS = [
@@ -124,6 +131,10 @@ function getActionIcon(action: string) {
       return <XCircle className="h-4 w-4 text-red-600" />;
     case "CANCEL":
       return <XCircle className="h-4 w-4 text-muted-foreground" />;
+    case "RECONCILE":
+      return <FileCheck className="h-4 w-4 text-indigo-600" />;
+    case "MODIFY":
+      return <Pencil className="h-4 w-4 text-blue-600" />;
     default:
       return <Clock className="h-4 w-4 text-yellow-600" />;
   }
@@ -132,7 +143,9 @@ function getActionIcon(action: string) {
 function approvalLogTitle(log: LeaveApprovalLog): string {
   switch (log.action) {
     case "MODIFY":
-      return "Request Sent";
+      return "Request modified";
+    case "RECONCILE":
+      return "Reconciled by HR";
     case "APPROVE":
       return "Approved";
     default:
@@ -276,6 +289,13 @@ export default function LeaveRequestDetailPage({
   const [approvalModal, setApprovalModal] = useState<{
     action: ApprovalModalAction;
   } | null>(null);
+  const [hrEditOpen, setHrEditOpen] = useState(false);
+  const [hrCancelOpen, setHrCancelOpen] = useState(false);
+  const [hrEditForm, setHrEditForm] = useState<LeaveReconcileEditPayload & {
+    cover_person_id: string | null;
+  } | null>(null);
+  const [hrEditError, setHrEditError] = useState<string | null>(null);
+  const [hrCancelComment, setHrCancelComment] = useState("");
 
   const {
     data: request,
@@ -416,18 +436,22 @@ export default function LeaveRequestDetailPage({
   });
 
   const cancelMutation = useMutation({
-    mutationFn: () => apiPost<LeaveRequest>(`leave-requests/${id}/cancel`),
+    mutationFn: (comment?: string) => cancelLeaveRequest(id, comment),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leave-request", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-request-logs", id] });
       queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
       queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
       setEditError(null);
+      setHrCancelOpen(false);
+      setHrCancelComment("");
     },
     onError: (err) => {
       setEditError(err instanceof ApiError ? err.message : "Failed to cancel.");
     },
   });
+
+  const editReconciledMutation = useEditReconciledLeave(id);
 
   const { data: logsRaw } = useQuery({
     queryKey: ["leave-request-logs", id],
@@ -472,6 +496,12 @@ export default function LeaveRequestDetailPage({
   }
 
   const employeeName = `${request.employee.first_name} ${request.employee.last_name}`;
+  const isReconciled = isReconciledRequest(request);
+  const isHr = hasRole(user, "HR");
+  const canHrEditReconciled =
+    isHr && isReconciled && request.status === "APPROVED";
+  const canHrCancelApproved =
+    isHr && request.status === "APPROVED";
 
   const baseForm = {
     leave_type: request.leave_type.id,
@@ -564,6 +594,48 @@ export default function LeaveRequestDetailPage({
     });
   }
 
+  function handleOpenHrEdit() {
+    if (!request) return;
+    setHrEditForm({
+      leave_type: request.leave_type.id,
+      start_date: request.start_date,
+      end_date: request.end_date,
+      reason: request.reason ?? "",
+      cover_person_id: extractCoverPersonId(request.cover_person) || null,
+      edit_note: "",
+      allow_insufficient_balance: false,
+    });
+    setHrEditError(null);
+    setHrEditOpen(true);
+  }
+
+  function handleHrEditSave() {
+    if (!hrEditForm) return;
+    setHrEditError(null);
+    editReconciledMutation.mutate(
+      {
+        leave_type: hrEditForm.leave_type,
+        start_date: hrEditForm.start_date,
+        end_date: hrEditForm.end_date,
+        reason: hrEditForm.reason,
+        cover_person: hrEditForm.cover_person_id || null,
+        edit_note: hrEditForm.edit_note?.trim() || undefined,
+        allow_insufficient_balance: hrEditForm.allow_insufficient_balance,
+      },
+      {
+        onSuccess: () => {
+          setHrEditOpen(false);
+          setHrEditForm(null);
+        },
+        onError: (err) => {
+          setHrEditError(
+            err instanceof ApiError ? err.message : "Failed to update."
+          );
+        },
+      }
+    );
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       {/* Breadcrumb */}
@@ -586,15 +658,17 @@ export default function LeaveRequestDetailPage({
             {request.leave_type.name}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Submitted by {employeeName} on{" "}
-            {formatDate(request.created_at)}
+            {isReconciled
+              ? `Reconciled leave for ${employeeName}`
+              : `Submitted by ${employeeName} on ${formatDate(request.created_at)}`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <StatusBadge
             status={request.status}
             className="text-sm px-3 py-1"
           />
+          {isReconciled && <ReconciledBadge className="text-sm px-3 py-1" />}
           {showApproverActions && (
             <div className="flex items-center gap-2">
               <button
@@ -613,7 +687,7 @@ export default function LeaveRequestDetailPage({
           )}
           {canOwnerCancel && (
             <button
-              onClick={() => cancelMutation.mutate()}
+              onClick={() => cancelMutation.mutate(undefined)}
               disabled={cancelMutation.isPending}
               className="flex items-center gap-2 rounded-lg border border-destructive px-3 py-1.5 text-sm font-medium text-destructive transition hover:bg-destructive/10 disabled:opacity-50"
             >
@@ -621,6 +695,24 @@ export default function LeaveRequestDetailPage({
                 <Loader2 className="h-4 w-4 animate-spin" />
               )}
               Cancel request
+            </button>
+          )}
+          {canHrEditReconciled && (
+            <button
+              onClick={handleOpenHrEdit}
+              className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit reconciled leave
+            </button>
+          )}
+          {canHrCancelApproved && (
+            <button
+              onClick={() => setHrCancelOpen(true)}
+              disabled={cancelMutation.isPending}
+              className="flex items-center gap-2 rounded-lg border border-destructive px-3 py-1.5 text-sm font-medium text-destructive transition hover:bg-destructive/10 disabled:opacity-50"
+            >
+              Cancel leave
             </button>
           )}
           {canEdit && !editForm && (
@@ -667,6 +759,8 @@ export default function LeaveRequestDetailPage({
           {editError}
         </div>
       )}
+
+      {isReconciled && <ReconciledBanner request={request} />}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Detail card */}
@@ -959,6 +1053,208 @@ export default function LeaveRequestDetailPage({
           )}
         </div>
       </div>
+
+      {hrEditOpen && hrEditForm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => setHrEditOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="relative w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl space-y-4">
+            <h2 className="text-lg font-semibold text-foreground">
+              Edit reconciled leave
+            </h2>
+            {hrEditError && (
+              <p className="text-sm text-destructive">{hrEditError}</p>
+            )}
+            <div>
+              <FieldLabel htmlFor={`hr-edit-type-${id}`}>Leave type</FieldLabel>
+              <select
+                id={`hr-edit-type-${id}`}
+                value={hrEditForm.leave_type ?? ""}
+                onChange={(e) =>
+                  setHrEditForm((f) =>
+                    f ? { ...f, leave_type: e.target.value } : null
+                  )
+                }
+                className={stitchSelectClass}
+              >
+                {leaveTypes.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <FieldLabel htmlFor={`hr-edit-start-${id}`}>Start</FieldLabel>
+                <input
+                  id={`hr-edit-start-${id}`}
+                  type="date"
+                  value={hrEditForm.start_date ?? ""}
+                  onChange={(e) =>
+                    setHrEditForm((f) =>
+                      f ? { ...f, start_date: e.target.value } : null
+                    )
+                  }
+                  className={stitchFieldClass}
+                />
+              </div>
+              <div>
+                <FieldLabel htmlFor={`hr-edit-end-${id}`}>End</FieldLabel>
+                <input
+                  id={`hr-edit-end-${id}`}
+                  type="date"
+                  value={hrEditForm.end_date ?? ""}
+                  min={hrEditForm.start_date ?? undefined}
+                  onChange={(e) =>
+                    setHrEditForm((f) =>
+                      f ? { ...f, end_date: e.target.value } : null
+                    )
+                  }
+                  className={stitchFieldClass}
+                />
+              </div>
+            </div>
+            <div>
+              <FieldLabel htmlFor={`hr-edit-reason-${id}`} optional>Reason</FieldLabel>
+              <textarea
+                id={`hr-edit-reason-${id}`}
+                rows={2}
+                value={hrEditForm.reason ?? ""}
+                onChange={(e) =>
+                  setHrEditForm((f) =>
+                    f ? { ...f, reason: e.target.value } : null
+                  )
+                }
+                className={stitchTextareaClass}
+              />
+            </div>
+            <UserSearchField
+              label="Cover person"
+              value={hrEditForm.cover_person_id}
+              onChange={(uid) =>
+                setHrEditForm((f) =>
+                  f ? { ...f, cover_person_id: uid } : null
+                )
+              }
+              optional
+            />
+            <div>
+              <FieldLabel htmlFor={`hr-edit-note-${id}`}>Edit note</FieldLabel>
+              <textarea
+                id={`hr-edit-note-${id}`}
+                rows={2}
+                value={hrEditForm.edit_note ?? ""}
+                onChange={(e) =>
+                  setHrEditForm((f) =>
+                    f ? { ...f, edit_note: e.target.value } : null
+                  )
+                }
+                placeholder="Reason for this correction…"
+                className={stitchTextareaClass}
+              />
+            </div>
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                checked={hrEditForm.allow_insufficient_balance ?? false}
+                onChange={(e) =>
+                  setHrEditForm((f) =>
+                    f
+                      ? { ...f, allow_insufficient_balance: e.target.checked }
+                      : null
+                  )
+                }
+                className="mt-1"
+              />
+              <span className="text-sm text-muted-foreground">
+                Allow insufficient balance (may result in negative remaining)
+              </span>
+            </label>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setHrEditOpen(false)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleHrEditSave}
+                disabled={editReconciledMutation.isPending}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {editReconciledMutation.isPending && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Save changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hrCancelOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => setHrCancelOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="relative w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-foreground">
+              Cancel approved leave?
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This will restore the employee&apos;s leave balance for the deducted
+              days.
+            </p>
+            <div className="mt-4">
+              <FieldLabel htmlFor={`hr-cancel-comment-${id}`} optional>
+                Comment
+              </FieldLabel>
+              <textarea
+                id={`hr-cancel-comment-${id}`}
+                rows={2}
+                value={hrCancelComment}
+                onChange={(e) => setHrCancelComment(e.target.value)}
+                placeholder="e.g. Recorded in error"
+                className={stitchTextareaClass}
+              />
+            </div>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={() => setHrCancelOpen(false)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+              >
+                Keep leave
+              </button>
+              <button
+                onClick={() =>
+                  cancelMutation.mutate(hrCancelComment.trim() || undefined)
+                }
+                disabled={cancelMutation.isPending}
+                className="flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground disabled:opacity-50"
+              >
+                {cancelMutation.isPending && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Cancel leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

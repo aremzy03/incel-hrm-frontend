@@ -63,6 +63,10 @@ export interface LeaveRequest {
   updated_at: string;
   /** Present when backend includes it (e.g. for DRAFT) */
   cover_person?: EmployeeMinimal | null;
+  is_reconciled?: boolean;
+  reconciled_by?: EmployeeMinimal | null;
+  reconciled_at?: string | null;
+  reconciliation_note?: string;
 }
 
 export interface EligibleRelieversResponse {
@@ -76,7 +80,7 @@ export interface LeaveApprovalLog {
   id: string;
   leave_request: string;
   actor: EmployeeMinimal;
-  action: "APPROVE" | "REJECT" | "CANCEL" | "MODIFY";
+  action: "APPROVE" | "REJECT" | "CANCEL" | "MODIFY" | "RECONCILE";
   action_display: string;
   comment: string;
   timestamp: string;
@@ -131,4 +135,49 @@ export interface CalendarEntry {
   start_date: string;
   end_date: string;
   total_working_days: number;
+}
+
+export interface LeaveReconcilePayload {
+  employee: string;
+  leave_type: string;
+  start_date: string;
+  end_date: string;
+  reconciliation_note: string;
+  reason?: string;
+  cover_person?: string | null;
+  allow_insufficient_balance?: boolean;
+  notify_department_colleagues?: boolean;
+}
+
+export interface LeaveReconcileRowPayload {
+  employee: string;
+  leave_type: string;
+  start_date: string;
+  end_date: string;
+  reconciliation_note: string;
+  reason?: string;
+  cover_person?: string | null;
+}
+
+export interface BulkReconcilePayload {
+  rows: LeaveReconcileRowPayload[];
+  allow_insufficient_balance?: boolean;
+  notify_department_colleagues?: boolean;
+}
+
+export interface BulkReconcileResponse {
+  created: string[];
+  errors: Array<{ index: number; errors: unknown }>;
+  created_count: number;
+  parse_errors?: Array<{ line: number; error: string }>;
+}
+
+export interface LeaveReconcileEditPayload {
+  leave_type?: string;
+  start_date?: string;
+  end_date?: string;
+  reason?: string;
+  cover_person?: string | null;
+  edit_note?: string;
+  allow_insufficient_balance?: boolean;
 }

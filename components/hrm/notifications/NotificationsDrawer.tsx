@@ -265,6 +265,11 @@ function NotificationRow({
             For your information — no action required
           </p>
         )}
+        {n.type === "LEAVE_RECONCILED" && (
+          <p className="mt-1 text-xs text-on-surface-variant/80">
+            Leave reconciled by HR — informational only
+          </p>
+        )}
         <p className="mt-2 text-xs text-on-surface-variant">
           {formatWhen(n.created_at)}
         </p>

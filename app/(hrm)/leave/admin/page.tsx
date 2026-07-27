@@ -10,8 +10,11 @@ import { PageHeader } from "@/components/hrm/ui/PageHeader";
 import { DataTable } from "@/components/hrm/ui/DataTable";
 import { apiGet, apiPost, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
+import { hasRole } from "@/lib/rbac";
 import { LEAVE_STATUS_DISPLAY } from "@/lib/types/leave";
 import { canUserActOnLeaveRequest } from "@/lib/leave/approval";
+import { ReconciledBadge } from "@/components/hrm/leave/ReconciledBadge";
+import { isReconciledRequest } from "@/lib/leave/reconciliation";
 import type {
   LeaveRequest,
   LeaveStatus,
@@ -205,6 +208,7 @@ export default function AdminApprovalsPage() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | string>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("all");
+  const [reconciledFilter, setReconciledFilter] = useState<"all" | "reconciled" | "normal">("all");
   const [modal, setModal] = useState<ModalState | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -230,9 +234,14 @@ export default function AdminApprovalsPage() {
       const nameMatch = !q || fullName.includes(q);
       const typeMatch = typeFilter === "all" || r.leave_type.name === typeFilter;
       const statusMatch = statusFilter === "all" || r.status === statusFilter;
-      return nameMatch && typeMatch && statusMatch;
+      const reconciled = isReconciledRequest(r);
+      const reconciledMatch =
+        reconciledFilter === "all" ||
+        (reconciledFilter === "reconciled" && reconciled) ||
+        (reconciledFilter === "normal" && !reconciled);
+      return nameMatch && typeMatch && statusMatch && reconciledMatch;
     });
-  }, [records, search, typeFilter, statusFilter]);
+  }, [records, search, typeFilter, statusFilter, reconciledFilter]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -299,7 +308,12 @@ export default function AdminApprovalsPage() {
   }, []);
 
   const hasFilters =
-    search !== "" || typeFilter !== "all" || statusFilter !== "all";
+    search !== "" ||
+    typeFilter !== "all" ||
+    statusFilter !== "all" ||
+    reconciledFilter !== "all";
+
+  const isHr = hasRole(user, "HR");
 
   return (
     <>
@@ -315,11 +329,21 @@ export default function AdminApprovalsPage() {
         <PageHeader
           title="Leave Approvals"
           action={
-            pendingCount > 0 ? (
-              <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-bold text-primary-foreground">
-                {pendingCount} Pending
-              </span>
-            ) : undefined
+            <div className="flex items-center gap-2">
+              {isHr && (
+                <Link
+                  href="/leave/reconciliation"
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
+                >
+                  Reconcile leave
+                </Link>
+              )}
+              {pendingCount > 0 ? (
+                <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-bold text-primary-foreground">
+                  {pendingCount} Pending
+                </span>
+              ) : null}
+            </div>
           }
         />
 
@@ -375,12 +399,28 @@ export default function AdminApprovalsPage() {
                 ))}
               </select>
 
+              <select
+                value={reconciledFilter}
+                onChange={(e) =>
+                  setReconciledFilter(
+                    e.target.value as "all" | "reconciled" | "normal"
+                  )
+                }
+                className={selectClass}
+                aria-label="Filter reconciled"
+              >
+                <option value="all">All records</option>
+                <option value="reconciled">Reconciled only</option>
+                <option value="normal">Non-reconciled</option>
+              </select>
+
               {hasFilters && (
                 <button
                   onClick={() => {
                     setSearch("");
                     setTypeFilter("all");
                     setStatusFilter("all");
+                    setReconciledFilter("all");
                   }}
                   className="flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted"
                 >
@@ -442,7 +482,12 @@ export default function AdminApprovalsPage() {
                       })}
                     </span>
                   ),
-                  status: <StatusBadge status={row.status} />,
+                  status: (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge status={row.status} />
+                      {isReconciledRequest(row) && <ReconciledBadge />}
+                    </div>
+                  ),
                   action: showActions ? (
                     <div className="flex items-center gap-2">
                       <button

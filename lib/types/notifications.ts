@@ -3,6 +3,7 @@ export type NotificationType =
   | "LEAVE_ACTION_REQUIRED"
   | "LEAVE_APPROVED"
   | "LEAVE_REJECTED"
+  | "LEAVE_RECONCILED"
   | "LOAN_SUBMITTED"
   | "LOAN_APPROVED"
   | "LOAN_REJECTED"

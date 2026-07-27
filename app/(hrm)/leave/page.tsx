@@ -8,6 +8,7 @@ import {
   Clock,
   Users,
   ArrowRight,
+  Eye,
 } from "lucide-react";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
 import { StatCard } from "@/components/hrm/ui/StatCard";
@@ -25,6 +26,7 @@ const TABLE_COLUMNS = [
   { key: "duration", label: "Duration" },
   { key: "days", label: "Days", mono: true },
   { key: "status", label: "Status" },
+  { key: "view", label: "View" },
 ];
 
 function formatLeaveDuration(start: string, end: string): string {
@@ -128,6 +130,15 @@ export default function LeaveDashboardPage() {
         <span className="text-on-surface-variant">{row.total_working_days}</span>
       ),
       status: <StatusBadge status={row.status} />,
+      view: (
+        <Link
+          href={`/leave/requests/${row.id}`}
+          className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+        >
+          <Eye className="h-3.5 w-3.5" aria-hidden />
+          View
+        </Link>
+      ),
     };
   });
 

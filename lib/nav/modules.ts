@@ -103,6 +103,12 @@ export const MODULE_CONFIGS: Record<ModuleId, ModuleConfig> = {
         icon: Tags,
         allowedRoles: HR_ROLES,
       },
+      {
+        label: "Leave Reconciliation",
+        href: "/leave/reconciliation",
+        icon: FileText,
+        allowedRoles: ["HR"],
+      },
     ],
   },
   loans: {
