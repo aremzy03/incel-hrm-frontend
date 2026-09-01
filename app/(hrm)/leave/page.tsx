@@ -18,6 +18,7 @@ import { EmployeeAvatar } from "@/components/hrm/ui/EmployeeAvatar";
 import { LeaveBalanceStrip } from "@/components/hrm/leave/LeaveBalanceStrip";
 import { Button } from "@/components/ui/button";
 import { apiGet } from "@/lib/api-client";
+import { availableBalanceDays, formatLeaveDays } from "@/lib/leave/format";
 import type { LeaveBalance, LeaveRequest, PaginatedResponse } from "@/lib/types/leave";
 
 const TABLE_COLUMNS = [
@@ -91,10 +92,13 @@ export default function LeaveDashboardPage() {
     ? requests
     : requests?.results ?? [];
 
-  const annualBalance = balanceList.find((b) =>
-    b.leave_type.name.toLowerCase().includes("annual")
+  const annualBalance = balanceList.find(
+    (b) => (b.leave_type.code ?? "").toUpperCase() === "ANNUAL"
   );
-  const totalUsed = balanceList.reduce((acc, b) => acc + b.used_days, 0);
+  const totalUsed = balanceList.reduce(
+    (acc, b) => acc + Number(b.used_days ?? 0),
+    0
+  );
   const pendingCount = requestList.filter((r) =>
     r.status.startsWith("PENDING")
   ).length;
@@ -127,7 +131,7 @@ export default function LeaveDashboardPage() {
         </span>
       ),
       days: (
-        <span className="text-on-surface-variant">{row.total_working_days}</span>
+        <span className="text-on-surface-variant">{formatLeaveDays(row.total_working_days)}</span>
       ),
       status: <StatusBadge status={row.status} />,
       view: (
@@ -181,13 +185,13 @@ export default function LeaveDashboardPage() {
           >
             <StatCard
               label="Annual Leave Balance"
-              value={String(annualBalance?.remaining_days ?? 0)}
+              value={formatLeaveDays(annualBalance ? availableBalanceDays(annualBalance) : 0)}
               icon={<CalendarDays />}
-              trend="days remaining"
+              trend="days available"
             />
             <StatCard
               label="Leave Taken This Year"
-              value={String(totalUsed)}
+              value={(Math.round(totalUsed * 100) / 100).toFixed(2)}
               icon={<CheckCircle />}
               trend="days"
             />

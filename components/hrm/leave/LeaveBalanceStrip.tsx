@@ -1,8 +1,8 @@
 import type { LeaveBalance } from "@/lib/types/leave";
+import { availableBalanceDays, formatLeaveDays } from "@/lib/leave/format";
 
 interface LeaveBalanceStripProps {
   balances: LeaveBalance[];
-  /** When true, omit the outer card wrapper (for embedding in another panel). */
   embedded?: boolean;
 }
 
@@ -12,22 +12,29 @@ export function LeaveBalanceStrip({ balances, embedded = false }: LeaveBalanceSt
   const content = (
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
       {balances.map((b) => {
-        const total = b.allocated_days;
-        const pct = total > 0 ? Math.round((b.remaining_days / total) * 100) : 0;
+        const total = Number(b.allocated_days);
+        const available = availableBalanceDays(b);
+        const pct = total > 0 ? Math.round((available / total) * 100) : 0;
         return (
           <div key={b.id} className="space-y-1.5">
             <div className="flex justify-between text-sm font-medium">
               <span className="text-on-surface">{b.leave_type.name}</span>
               <span className="text-on-surface-variant">
-                {b.remaining_days}/{total} days
+                {formatLeaveDays(available)}/{formatLeaveDays(total)}
               </span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high">
               <div
                 className="h-full rounded-full bg-primary-container transition-all"
-                style={{ width: `${Math.min(100, pct)}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
               />
             </div>
+            {Number(b.carried_forward_days ?? 0) > 0 && (
+              <p className="text-[11px] text-on-surface-variant">
+                {formatLeaveDays(b.carried_forward_days)} carried
+                {b.carry_forward_expires_on ? ` · exp ${b.carry_forward_expires_on}` : ""}
+              </p>
+            )}
           </div>
         );
       })}
