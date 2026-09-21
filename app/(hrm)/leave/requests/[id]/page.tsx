@@ -49,6 +49,8 @@ import {
 } from "@/lib/leave/reliever";
 import { FieldLabel } from "@/components/hrm/forms/FieldLabel";
 import { RelieverField } from "@/components/hrm/leave/RelieverField";
+import { formatLeaveDays } from "@/lib/leave/format";
+import { useLeavePolicyResolution } from "@/lib/api/leave-assignments";
 import type {
   LeaveRequest,
   LeaveApprovalLog,
@@ -73,7 +75,37 @@ const PENDING_STEP_INDEX: Partial<Record<LeaveStatus, number>> = {
   PENDING_ED: 4,
 };
 
-function buildApprovalSteps(status: LeaveStatus): ApprovalStep[] {
+function buildApprovalSteps(
+  status: LeaveStatus,
+  snapshot?: LeaveRequest["workflow_snapshot"]
+): ApprovalStep[] {
+  const stages = snapshot?.stages;
+  if (stages && stages.length > 0) {
+    const activeIdx = stages.findIndex((s) => s.status_code === status);
+    if (status === "APPROVED") {
+      return stages.map((s) => ({
+        label: s.label || s.approver_source || s.status_code || "Stage",
+        state: "completed" as const,
+      }));
+    }
+    if (status === "REJECTED" || status === "CANCELLED" || status === "DRAFT") {
+      return stages.map((s) => ({
+        label: s.label || s.approver_source || s.status_code || "Stage",
+        state: "upcoming" as const,
+      }));
+    }
+    return stages.map((s, i) => ({
+      label: s.label || s.approver_source || s.status_code || "Stage",
+      state:
+        activeIdx === -1
+          ? ("upcoming" as const)
+          : i < activeIdx
+            ? ("completed" as const)
+            : i === activeIdx
+              ? ("active" as const)
+              : ("upcoming" as const),
+    }));
+  }
   if (status === "APPROVED") {
     return APPROVAL_STEP_LABELS.map((label) => ({
       label,
@@ -319,7 +351,14 @@ export default function LeaveRequestDetailPage({
   const canEdit = !!request && isOwnDraft;
 
   const { data: eligibleRelievers, isLoading: relieversLoading } =
-    useEligibleRelievers({ enabled: canEdit });
+    useEligibleRelievers({
+      enabled: canEdit && !!(editForm?.leave_type ?? request?.leave_type.id),
+      leaveTypeId: editForm?.leave_type ?? request?.leave_type.id,
+    });
+  const { data: draftResolution } = useLeavePolicyResolution(
+    { leave_type: editForm?.leave_type ?? request?.leave_type.id ?? "" },
+    { enabled: canEdit && !!(editForm?.leave_type ?? request?.leave_type.id) }
+  );
   const isOwner = !!request && request?.employee?.id === user?.id;
 
   const isPending = (request?.status as string | undefined)?.startsWith("PENDING");
@@ -515,7 +554,7 @@ export default function LeaveRequestDetailPage({
   const selectedLeaveType =
     leaveTypes.find((t) => t.id === formValues.leave_type) ?? request.leave_type;
   const relieverRequired = isRelieverRequired({
-    leaveTypeName: selectedLeaveType.name,
+    relieverRequired: draftResolution?.resolved_policy?.reliever_required,
     isEmergency: request.is_emergency,
     user,
   });
@@ -536,7 +575,7 @@ export default function LeaveRequestDetailPage({
       ? formatRelieverName(request.cover_person)
       : null;
   const relieverRequiredForDisplay = isRelieverRequiredByPolicy({
-    leaveTypeName: request.leave_type.name,
+    relieverRequired: request.cover_person ? true : draftResolution?.resolved_policy?.reliever_required,
     isEmergency: request.is_emergency,
   });
 
@@ -781,11 +820,10 @@ export default function LeaveRequestDetailPage({
                     value={editForm.leave_type}
                     onChange={(e) => {
                       const nextId = e.target.value;
-                      const nextType = leaveTypes.find((t) => t.id === nextId);
                       setEditForm((f) => {
                         if (!f) return null;
                         const nextRelieverRequired = isRelieverRequired({
-                          leaveTypeName: nextType?.name ?? request.leave_type.name,
+                          relieverRequired: draftResolution?.resolved_policy?.reliever_required,
                           isEmergency: request.is_emergency,
                           user,
                         });
@@ -962,8 +1000,11 @@ export default function LeaveRequestDetailPage({
                     {formatDate(request.end_date)}
                   </dd>
                   <dd className="text-xs text-muted-foreground">
-                    {request.total_working_days} working day
-                    {request.total_working_days !== 1 ? "s" : ""}
+                    {formatLeaveDays(request.total_working_days)} working day
+                    {Number(request.total_working_days) !== 1 ? "s" : ""}
+                    {request.is_half_day
+                      ? ` (half-day ${request.half_day_period || ""})`
+                      : ""}
                   </dd>
                 </div>
               </div>
@@ -996,6 +1037,16 @@ export default function LeaveRequestDetailPage({
                 </p>
               </div>
             )}
+            {(request.policy || request.policy_version != null) && (
+              <p className="mt-4 text-xs text-muted-foreground">
+                Calculated with policy {request.policy ? `${request.policy.slice(0, 8)}…` : ""} v{request.policy_version ?? "—"}
+              </p>
+            )}
+            {request.calculation_snapshot && (
+              <pre className="mt-3 max-h-40 overflow-auto rounded-lg bg-muted/50 p-3 text-[11px]">
+                {JSON.stringify(request.calculation_snapshot, null, 2)}
+              </pre>
+            )}
             </>
             )}
           </div>
@@ -1012,7 +1063,7 @@ export default function LeaveRequestDetailPage({
         <div className="space-y-4">
           <ApprovalChain
             title="Approval Timeline"
-            steps={buildApprovalSteps(request.status)}
+            steps={buildApprovalSteps(request.status, request.workflow_snapshot)}
           />
           {logs.length > 0 && (
             <div className={cn(stitchCardClass, "p-5")}>

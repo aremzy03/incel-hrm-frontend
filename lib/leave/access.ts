@@ -7,6 +7,13 @@ const PRIVILEGED_ROLES = [
   "MANAGING_DIRECTOR",
 ] as const;
 
+export const LEAVE_HR_ROLES = [...PRIVILEGED_ROLES];
+
+export function canManageLeaveSettings(user: User | null): boolean {
+  if (!user) return false;
+  return hasRole(user, ...PRIVILEGED_ROLES);
+}
+
 /** Mirrors backend `_can_view_employee_leave_profile` for UI gating. */
 export function canViewEmployeeLeaveProfile(
   viewer: User | null,

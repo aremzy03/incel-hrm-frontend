@@ -5,12 +5,12 @@ import {
   FilePlus,
   FileText,
   CheckCircle,
-  CalendarRange,
-  Tags,
   BarChart3,
   UserCircle,
   Building2,
   Settings,
+  Shield,
+  UserMinus,
 } from "lucide-react";
 import type { RoleName } from "@/lib/types/auth";
 import { LOAN_APPROVAL_NAV_ROLES } from "@/lib/rbac";
@@ -92,16 +92,27 @@ export const MODULE_CONFIGS: Record<ModuleId, ModuleConfig> = {
         tourTarget: "leave-nav-calendar",
       },
       {
-        label: "Public Holidays",
-        href: "/leave/public-holidays",
-        icon: CalendarRange,
+        label: "Leave settings",
+        href: "/leave/settings",
+        icon: Settings,
         allowedRoles: HR_ROLES,
       },
       {
-        label: "Leave Types",
-        href: "/leave/types",
-        icon: Tags,
+        label: "Blackout periods",
+        href: "/leave/blackouts",
+        icon: Shield,
         allowedRoles: HR_ROLES,
+      },
+      {
+        label: "Leave reports",
+        href: "/leave/reports",
+        icon: BarChart3,
+        allowedRoles: HR_ROLES,
+      },
+      {
+        label: "Out of office",
+        href: "/leave/delegates",
+        icon: UserMinus,
       },
       {
         label: "Leave Reconciliation",
@@ -185,6 +196,9 @@ export function isModuleTabActive(pathname: string, href: string): boolean {
 export function isSidebarItemActive(pathname: string, href: string): boolean {
   if (href === "/leave" || href === "/loans") {
     return pathname === href;
+  }
+  if (href === "/leave/settings") {
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
