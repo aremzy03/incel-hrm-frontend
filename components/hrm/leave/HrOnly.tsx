@@ -12,7 +12,22 @@ export function HrOnly({
   title: string;
   children: React.ReactNode;
 }) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-7xl space-y-8" aria-busy="true">
+        <div className="h-5 w-48 animate-pulse rounded-md bg-surface-container-high" />
+        <div className="space-y-3">
+          <div className="h-8 w-64 animate-pulse rounded-lg bg-surface-container-high" />
+          <div className="h-5 w-80 max-w-full animate-pulse rounded-md bg-surface-container-high" />
+        </div>
+        <div className="h-64 animate-pulse rounded-xl bg-surface-container-high" />
+        <p className="sr-only">Checking whether you can manage this setting.</p>
+      </div>
+    );
+  }
+
   if (!canManageLeaveSettings(user)) {
     return (
       <div className="mx-auto max-w-7xl space-y-4">

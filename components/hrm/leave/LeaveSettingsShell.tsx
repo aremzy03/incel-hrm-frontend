@@ -36,7 +36,7 @@ function SettingsHub() {
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="group flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-surface-container-high"
+                      className="group flex min-h-11 cursor-pointer items-start gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <span className="mt-0.5 text-primary">
                         <Icon className="h-4 w-4" aria-hidden />
@@ -50,7 +50,7 @@ function SettingsHub() {
                         </span>
                       </span>
                       <ChevronRight
-                        className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant opacity-0 transition-opacity group-hover:opacity-100"
+                        className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant opacity-40 transition-opacity group-hover:opacity-100"
                         aria-hidden
                       />
                     </Link>
@@ -73,8 +73,9 @@ function SettingsSubNav({ pathname }: { pathname: string }) {
     >
       <Link
         href={LEAVE_SETTINGS_HUB}
+        aria-current={pathname === LEAVE_SETTINGS_HUB ? "page" : undefined}
         className={cn(
-          "mb-2 flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+          "mb-2 flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           pathname === LEAVE_SETTINGS_HUB
             ? "bg-secondary-container text-on-secondary-fixed"
             : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
@@ -85,7 +86,7 @@ function SettingsSubNav({ pathname }: { pathname: string }) {
       </Link>
       {LEAVE_SETTINGS_GROUPS.map((group) => (
         <div key={group.id} className="border-t border-outline-variant/60 px-1 py-2 first:border-t-0">
-          <p className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/70">
+          <p className="px-2 py-1.5 text-label-md font-bold uppercase tracking-wider text-on-surface-variant">
             {group.label}
           </p>
           <ul className="space-y-0.5">
@@ -96,8 +97,9 @@ function SettingsSubNav({ pathname }: { pathname: string }) {
                 <li key={item.href}>
                   <Link
                     href={item.href}
+                    aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors",
+                      "flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       active
                         ? "bg-secondary-container font-semibold text-on-secondary-fixed"
                         : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"

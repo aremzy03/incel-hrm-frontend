@@ -103,14 +103,14 @@ export const LEAVE_TOURS: TourDefinition[] = [
         element: '[data-tour="leave-history-filters"]',
         title: "Filter your requests",
         description:
-          "Narrow the list by status or leave type to find a specific request quickly.",
+          "Filter by Waiting, Approved, Rejected, Draft, or leave type to find a request quickly.",
       },
       {
         route: "/leave/history",
         element: '[data-tour="leave-history-table"]',
         title: "Request details",
         description:
-          "Open any row to view full details. You can cancel a request while it is still pending approval.",
+          "Open any row for full details. Waiting rows name the next approver; rejected rows include the comment there. You can cancel a request while it is still pending approval.",
       },
       // —— Leave calendar ——
       {
