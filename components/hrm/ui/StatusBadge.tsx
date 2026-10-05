@@ -10,10 +10,18 @@ interface StatusBadgeProps {
 const STYLE_MAP: Record<string, string> = {
   APPROVED: "bg-green-100 text-green-700",
   Approved: "bg-green-100 text-green-700",
+  ACTIVE: "bg-green-100 text-green-700",
+  Active: "bg-green-100 text-green-700",
+  On: "bg-green-100 text-green-700",
   REJECTED: "bg-red-100 text-red-700",
   Rejected: "bg-red-100 text-red-700",
   CANCELLED: "bg-surface-container-high text-on-surface-variant",
   Cancelled: "bg-surface-container-high text-on-surface-variant",
+  INACTIVE: "bg-surface-container-high text-on-surface-variant",
+  Inactive: "bg-surface-container-high text-on-surface-variant",
+  ARCHIVED: "bg-surface-container-high text-on-surface-variant",
+  Archived: "bg-surface-container-high text-on-surface-variant",
+  Off: "bg-surface-container-high text-on-surface-variant",
   DRAFT: "bg-secondary-container text-on-secondary-container",
   Draft: "bg-secondary-container text-on-secondary-container",
   PENDING_TEAM_LEAD: "bg-amber-100 text-amber-700",
@@ -40,7 +48,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase",
+        "inline-flex w-fit max-w-full shrink-0 items-center whitespace-nowrap rounded-full px-3 py-1 text-[10px] font-bold uppercase",
         getStatusStyle(status),
         className
       )}

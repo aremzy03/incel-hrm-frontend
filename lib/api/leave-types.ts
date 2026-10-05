@@ -1,10 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  apiDelete,
-  apiGet,
-  apiPatch,
-  apiPost,
-} from "@/lib/api-client";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
+import { asList } from "@/lib/api/leave-helpers";
 import type {
   LeaveType,
   LeaveTypeCreatePayload,
@@ -21,7 +17,7 @@ export function useLeaveTypes() {
       const data = await apiGet<LeaveType[] | PaginatedResponse<LeaveType>>(
         "leave-types"
       );
-      return Array.isArray(data) ? data : data?.results ?? [];
+      return asList(data);
     },
   });
 }
@@ -58,5 +54,23 @@ export function useDeleteLeaveType() {
       qc.invalidateQueries({ queryKey: LEAVE_TYPES_KEY });
       qc.invalidateQueries({ queryKey: ["leave-balances"] });
     },
+  });
+}
+
+export function useActivateLeaveType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      apiPost<LeaveType>(`leave-types/${id}/activate/`, reason ? { reason } : undefined),
+    onSuccess: () => qc.invalidateQueries({ queryKey: LEAVE_TYPES_KEY }),
+  });
+}
+
+export function useDeactivateLeaveType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      apiPost<LeaveType>(`leave-types/${id}/deactivate/`, reason ? { reason } : undefined),
+    onSuccess: () => qc.invalidateQueries({ queryKey: LEAVE_TYPES_KEY }),
   });
 }

@@ -3,7 +3,7 @@
 import { useMemo, useState, useId } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Paperclip, CheckCircle, CalendarRange, Loader2 } from "lucide-react";
+import { CheckCircle, CalendarRange, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Breadcrumb } from "@/components/hrm/ui/Breadcrumb";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
@@ -24,9 +24,15 @@ import { useLeaveTypes } from "@/lib/api/leave-types";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   extractFieldError,
+  isAnnualOrCasualType,
+  isLeaveTypeEligibleForGender,
   isRelieverRequired,
+  isSickLeaveType,
   shouldShowRelieverField,
 } from "@/lib/leave/reliever";
+import { formatLeaveDays } from "@/lib/leave/format";
+import { useLeavePolicyResolution } from "@/lib/api/leave-assignments";
+import { canManageLeaveSettings } from "@/lib/leave/access";
 import { HolidayDatePicker } from "@/components/hrm/leave/HolidayDatePicker";
 import { listPublicHolidays } from "@/lib/api/public-holidays";
 import { buildHolidayLookup, countWorkingDaysPreview, toYmd } from "@/lib/public-holidays/utils";
@@ -78,29 +84,10 @@ function getValidationMessage(data: Record<string, unknown> | undefined): string
 }
 
 function isLeaveTypeEligible(
-  leaveTypeName: string,
+  type: { code?: string; name?: string },
   gender: string | undefined
 ): boolean {
-  const n = leaveTypeName.toLowerCase();
-  if (n.includes("maternity")) return gender === "FEMALE";
-  if (n.includes("paternity")) return gender === "MALE";
-  return true;
-}
-
-function countWorkingDays(startStr: string, endStr: string): number {
-  if (!startStr || !endStr) return 0;
-  const start = new Date(startStr);
-  const end = new Date(endStr);
-  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return 0;
-
-  let count = 0;
-  const cursor = new Date(start);
-  while (cursor <= end) {
-    const day = cursor.getDay();
-    if (day !== 0 && day !== 6) count++;
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return count;
+  return isLeaveTypeEligibleForGender(type, gender);
 }
 
 const OVERLAP_STATUSES: LeaveStatus[] = [
@@ -138,14 +125,6 @@ function hasOverlappingRequest(
   return null;
 }
 
-function isAnnualOrCasual(name: string): boolean {
-  const n = name.toLowerCase();
-  return n.includes("annual") || n.includes("casual");
-}
-
-function isSickLeave(name: string): boolean {
-  return name.toLowerCase().includes("sick");
-}
 
 function todayYmd(): string {
   const d = new Date();
@@ -174,6 +153,9 @@ export default function ApplyLeavePage() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [coverPersonError, setCoverPersonError] = useState<string | null>(null);
   const [overlapConfirmOpen, setOverlapConfirmOpen] = useState(false);
+  const [isHalfDay, setIsHalfDay] = useState(false);
+  const [halfDayPeriod, setHalfDayPeriod] = useState<"AM" | "PM">("AM");
+  const [blackoutOverride, setBlackoutOverride] = useState("");
 
   const deptId =
     typeof user?.department === "string"
@@ -181,8 +163,14 @@ export default function ApplyLeavePage() {
       : user?.department?.id ?? null;
 
   const { data: leaveTypesRaw, isLoading: typesLoading } = useLeaveTypes();
+  const isHr = canManageLeaveSettings(user);
+  const { data: resolution } = useLeavePolicyResolution(
+    { leave_type: leaveTypeId },
+    { enabled: !!leaveTypeId }
+  );
+  const resolvedPolicy = resolution?.resolved_policy ?? null;
   const { data: eligibleRelievers, isLoading: relieversLoading } =
-    useEligibleRelievers({ enabled: !!user });
+    useEligibleRelievers({ enabled: !!user && !!leaveTypeId, leaveTypeId });
 
   const currentYear = new Date().getFullYear();
   const { data: myRequestsRaw } = useQuery({
@@ -199,8 +187,8 @@ export default function ApplyLeavePage() {
   });
 
   const allLeaveTypes: LeaveType[] = leaveTypesRaw ?? [];
-  const leaveTypes = allLeaveTypes.filter((t) =>
-    isLeaveTypeEligible(t.name, user?.gender)
+  const leaveTypes = allLeaveTypes.filter(
+    (t) => t.is_active !== false && isLeaveTypeEligible(t, user?.gender)
   );
 
   const myRequests: LeaveRequest[] = Array.isArray(myRequestsRaw)
@@ -209,12 +197,13 @@ export default function ApplyLeavePage() {
 
   const selectedLeaveType = leaveTypes.find((t) => t.id === leaveTypeId);
   const allowsSameDayLeave = Boolean(
-    selectedLeaveType && isSickLeave(selectedLeaveType.name)
+    selectedLeaveType && isSickLeaveType(selectedLeaveType)
   );
   const minStartDate = allowsSameDayLeave ? todayYmd() : tomorrowYmd();
   const minEndDate = startDate || minStartDate;
+  const halfDayAllowed = !!resolvedPolicy?.half_day_allowed;
   const relieverRequired = isRelieverRequired({
-    leaveTypeName: selectedLeaveType?.name ?? "",
+    relieverRequired: resolvedPolicy?.reliever_required,
     isEmergency: false,
     user,
   });
@@ -223,7 +212,9 @@ export default function ApplyLeavePage() {
     coverPersonId,
   });
   const showAnnualCasualHint =
-    selectedLeaveType && isAnnualOrCasual(selectedLeaveType.name);
+    selectedLeaveType &&
+    (resolvedPolicy?.overlap_control_enabled ||
+      isAnnualOrCasualType(selectedLeaveType));
 
   const balances: LeaveBalance[] = Array.isArray(balancesRaw)
     ? balancesRaw
@@ -263,7 +254,9 @@ export default function ApplyLeavePage() {
   );
 
   const workingDays =
-    startDate && endDate
+    isHalfDay && halfDayAllowed && startDate
+      ? 0.5
+      : startDate && endDate
       ? countWorkingDaysPreview(
           new Date(startDate + "T00:00:00"),
           new Date(endDate + "T00:00:00"),
@@ -337,10 +330,16 @@ export default function ApplyLeavePage() {
   const payload: LeaveRequestCreatePayload = {
     leave_type: leaveTypeId,
     start_date: startDate,
-    end_date: endDate,
+    end_date: isHalfDay && halfDayAllowed ? startDate : endDate,
     reason,
     is_emergency: false,
     ...(coverPersonId ? { cover_person: coverPersonId } : {}),
+    ...(isHalfDay && halfDayAllowed
+      ? { is_half_day: true, half_day_period: halfDayPeriod }
+      : { is_half_day: false }),
+    ...(isHr && blackoutOverride
+      ? { blackout_override_reason: blackoutOverride }
+      : {}),
   };
 
   function doSaveDraft() {
@@ -441,7 +440,7 @@ export default function ApplyLeavePage() {
                       const nextType = leaveTypes.find((t) => t.id === nextId);
                       if (
                         !isRelieverRequired({
-                          leaveTypeName: nextType?.name ?? "",
+                          relieverRequired: resolvedPolicy?.reliever_required,
                           isEmergency: false,
                           user,
                         })
@@ -450,7 +449,7 @@ export default function ApplyLeavePage() {
                         setCoverPersonError(null);
                       }
                       // Same-day start is only allowed for sick leave
-                      const nextMin = nextType && isSickLeave(nextType.name)
+                      const nextMin = nextType && isSickLeaveType(nextType)
                         ? todayYmd()
                         : tomorrowYmd();
                       if (startDate && startDate < nextMin) {
@@ -507,6 +506,32 @@ export default function ApplyLeavePage() {
                 />
               )}
 
+              {halfDayAllowed && (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={isHalfDay}
+                      onChange={(e) => {
+                        setIsHalfDay(e.target.checked);
+                        if (e.target.checked && startDate) setEndDate(startDate);
+                      }}
+                    />
+                    Half-day leave
+                  </label>
+                  {isHalfDay && (
+                    <select
+                      className={stitchSelectClass}
+                      value={halfDayPeriod}
+                      onChange={(e) => setHalfDayPeriod(e.target.value as "AM" | "PM")}
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" data-tour="leave-date-range">
                 <div>
                   <FieldLabel htmlFor={`${formId}-start`}>
@@ -531,7 +556,7 @@ export default function ApplyLeavePage() {
                   <HolidayDatePicker
                     label="End date"
                     value={endDate}
-                    onChange={setEndDate}
+                    onChange={isHalfDay ? (next) => { setStartDate(next); setEndDate(next); } : setEndDate}
                     min={minEndDate}
                     holidayNameByDate={holidayNameByDate}
                     disableWeekendsAndHolidays
@@ -558,7 +583,7 @@ export default function ApplyLeavePage() {
                     {startDate && endDate
                       ? workingDays === 0
                         ? "0 days (check your dates)"
-                        : `${workingDays} working day${workingDays !== 1 ? "s" : ""}`
+                        : `${formatLeaveDays(workingDays)} working day${workingDays !== 1 ? "s" : ""}`
                       : "Select start and end dates"}
                   </span>
                 </div>
@@ -582,28 +607,21 @@ export default function ApplyLeavePage() {
                 />
               </div>
 
-              <div aria-disabled="true" className="relative select-none">
-                <FieldLabel htmlFor={`${formId}-file`} optional>
-                  Attach Document
-                </FieldLabel>
-                <div
-                  className="pointer-events-none flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-lowest p-6 text-center text-body-md text-on-surface-variant blur-[1.5px] opacity-50"
-                  aria-hidden="true"
-                >
-                  <Paperclip className="h-4 w-4" />
-                  Attach supporting document (optional)
+              {isHr && (
+                <div>
+                  <FieldLabel htmlFor={`${formId}-blackout`} optional>
+                    Blackout override reason (HR)
+                  </FieldLabel>
+                  <textarea
+                    id={`${formId}-blackout`}
+                    rows={2}
+                    value={blackoutOverride}
+                    onChange={(e) => setBlackoutOverride(e.target.value)}
+                    placeholder="Required when overriding a BLOCK blackout"
+                    className={stitchTextareaClass}
+                  />
                 </div>
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  Document upload is not available yet.
-                </p>
-                <input
-                  id={`${formId}-file`}
-                  type="file"
-                  className="sr-only"
-                  disabled
-                  tabIndex={-1}
-                />
-              </div>
+              )}
 
               <div data-tour="leave-submit-actions">
                 {submitted ? (

@@ -103,14 +103,14 @@ export const LEAVE_TOURS: TourDefinition[] = [
         element: '[data-tour="leave-history-filters"]',
         title: "Filter your requests",
         description:
-          "Narrow the list by status or leave type to find a specific request quickly.",
+          "Filter by Waiting, Approved, Rejected, Draft, or leave type to find a request quickly.",
       },
       {
         route: "/leave/history",
         element: '[data-tour="leave-history-table"]',
         title: "Request details",
         description:
-          "Open any row to view full details. You can cancel a request while it is still pending approval.",
+          "Open any row for full details. Waiting rows name the next approver; rejected rows include the comment there. You can cancel a request while it is still pending approval.",
       },
       // —— Leave calendar ——
       {
@@ -189,20 +189,20 @@ export const LEAVE_TOURS: TourDefinition[] = [
     requiredRoles: ["HR", "EXECUTIVE_DIRECTOR", "MANAGING_DIRECTOR"],
     steps: [
       {
-        route: "/leave/public-holidays",
+        route: "/leave/settings/public-holidays",
         element: '[data-tour="leave-holidays-upload"]',
         title: "Public holidays",
         description:
           "Upload a CSV of holidays so they are excluded from working-day calculations and highlighted in the date picker.",
       },
       {
-        route: "/leave/public-holidays",
+        route: "/leave/settings/public-holidays",
         element: '[data-tour="leave-holidays-list"]',
         title: "Holiday list",
         description: "Review holidays for the selected year after upload.",
       },
       {
-        route: "/leave/types",
+        route: "/leave/settings/types",
         element: '[data-tour="leave-types-list"]',
         title: "Leave types",
         description:

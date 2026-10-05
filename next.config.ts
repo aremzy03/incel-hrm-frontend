@@ -1,12 +1,16 @@
 import type { NextConfig } from "next";
 
+// Dev-only allowance so impeccable live mode can load.
+const __impeccableLiveDev =
+  process.env.NODE_ENV === "development" ? " http://localhost:8400" : "";
+
 const contentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval'${__impeccableLiveDev}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https: wss:",
+  `connect-src 'self' https: wss:${__impeccableLiveDev}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -15,6 +19,24 @@ const contentSecurityPolicy = [
 const nextConfig: NextConfig = {
   output: "standalone",
   allowedDevOrigins: ["localhost", "127.0.0.1"],
+  async redirects() {
+    return [
+      { source: "/leave/types", destination: "/leave/settings/types", permanent: false },
+      {
+        source: "/leave/policies/:path*",
+        destination: "/leave/settings/policies/:path*",
+        permanent: false,
+      },
+      { source: "/leave/assignments", destination: "/leave/settings/assignments", permanent: false },
+      { source: "/leave/workflows", destination: "/leave/settings/workflows", permanent: false },
+      { source: "/leave/calendars", destination: "/leave/settings/calendars", permanent: false },
+      {
+        source: "/leave/public-holidays",
+        destination: "/leave/settings/public-holidays",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

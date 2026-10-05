@@ -5,6 +5,7 @@ import type {
   BulkReconcileResponse,
   EligibleRelieversResponse,
   LeaveBalance,
+  LeaveBalanceTransaction,
   LeaveReconcileEditPayload,
   LeaveReconcilePayload,
   LeaveRequest,
@@ -37,7 +38,10 @@ export const leaveKeys = {
   logs: (id: string) => ["leave-request-logs", id] as const,
   balances: (filters?: LeaveBalanceListParams) =>
     ["leave-balances", filters ?? {}] as const,
-  eligibleRelievers: ["leave-eligible-relievers"] as const,
+  eligibleRelievers: (leaveType?: string) =>
+    ["leave-eligible-relievers", leaveType ?? ""] as const,
+  transactions: (balanceId: string) =>
+    ["leave-balance-transactions", balanceId] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -142,11 +146,16 @@ export function useLeaveRequestsPage(
   });
 }
 
-export function useEligibleRelievers(options?: { enabled?: boolean }) {
+export function useEligibleRelievers(
+  options?: { enabled?: boolean; leaveTypeId?: string }
+) {
+  const leaveTypeId = options?.leaveTypeId;
   return useQuery<EligibleRelieversResponse>({
-    queryKey: leaveKeys.eligibleRelievers,
+    queryKey: leaveKeys.eligibleRelievers(leaveTypeId),
     queryFn: () =>
-      apiGet<EligibleRelieversResponse>("leave-requests/eligible-relievers/"),
+      apiGet<EligibleRelieversResponse>(
+        `leave-requests/eligible-relievers/${leaveTypeId ? `?leave_type=${leaveTypeId}` : ""}`
+      ),
     enabled: options?.enabled ?? true,
   });
 }
@@ -298,6 +307,40 @@ export function useEditReconciledLeave(id: string) {
       qc.invalidateQueries({ queryKey: ["leave-request-logs", id] });
       qc.invalidateQueries({ queryKey: ["leave-requests"] });
       qc.invalidateQueries({ queryKey: ["leave-balances"] });
+    },
+  });
+}
+
+export function useBalanceTransactions(balanceId: string, enabled = true) {
+  return useQuery<LeaveBalanceTransaction[]>({
+    queryKey: leaveKeys.transactions(balanceId),
+    queryFn: async () => {
+      const data = await apiGet<
+        PaginatedResponse<LeaveBalanceTransaction> | LeaveBalanceTransaction[]
+      >(`leave-balances/${balanceId}/transactions/`);
+      return Array.isArray(data) ? data : data.results ?? [];
+    },
+    enabled: !!balanceId && enabled,
+  });
+}
+
+export function useAdjustLeaveBalance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: { delta: string; reason: string; effective_date?: string };
+    }) =>
+      apiPost<{ balance: LeaveBalance; transaction: LeaveBalanceTransaction }>(
+        `leave-balances/${id}/adjust/`,
+        payload
+      ),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["leave-balances"] });
+      qc.invalidateQueries({ queryKey: leaveKeys.transactions(vars.id) });
     },
   });
 }

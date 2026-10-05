@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  CalendarDays,
   CheckCircle,
   Clock,
   Users,
   ArrowRight,
-  Eye,
 } from "lucide-react";
 import { PageHeader } from "@/components/hrm/ui/PageHeader";
 import { StatCard } from "@/components/hrm/ui/StatCard";
@@ -18,64 +17,32 @@ import { EmployeeAvatar } from "@/components/hrm/ui/EmployeeAvatar";
 import { LeaveBalanceStrip } from "@/components/hrm/leave/LeaveBalanceStrip";
 import { Button } from "@/components/ui/button";
 import { apiGet } from "@/lib/api-client";
-import type { LeaveBalance, LeaveRequest, PaginatedResponse } from "@/lib/types/leave";
-
-const TABLE_COLUMNS = [
-  { key: "employee", label: "Employee" },
-  { key: "type", label: "Leave Type" },
-  { key: "duration", label: "Duration" },
-  { key: "days", label: "Days", mono: true },
-  { key: "status", label: "Status" },
-  { key: "view", label: "View" },
-];
-
-function formatLeaveDuration(start: string, end: string): string {
-  const startDate = new Date(`${start}T00:00:00`);
-  const endDate = new Date(`${end}T00:00:00`);
-  const monthYear = startDate.toLocaleDateString("en-GB", {
-    month: "short",
-    year: "numeric",
-  });
-
-  if (start === end) {
-    return startDate.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  }
-
-  const sameMonth =
-    startDate.getMonth() === endDate.getMonth() &&
-    startDate.getFullYear() === endDate.getFullYear();
-
-  if (sameMonth) {
-    return `${startDate.getDate()}–${endDate.getDate()} ${monthYear}`;
-  }
-
-  const startLabel = startDate.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-  });
-  const endLabel = endDate.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-
-  return `${startLabel} – ${endLabel}`;
-}
+import { useAuth } from "@/contexts/AuthContext";
+import { hasRole } from "@/lib/rbac";
+import { useLeaveBalances } from "@/lib/api/leave";
+import { formatLeaveDays, formatLeaveDuration } from "@/lib/leave/format";
+import type { LeaveRequest, PaginatedResponse } from "@/lib/types/leave";
 
 export default function LeaveDashboardPage() {
+  const { user, isLoading: authLoading } = useAuth();
   const currentYear = new Date().getFullYear();
+  const isApprover = hasRole(
+    user,
+    "TEAM_LEAD",
+    "SUPERVISOR",
+    "LINE_MANAGER",
+    "HR",
+    "EXECUTIVE_DIRECTOR",
+    "MANAGING_DIRECTOR"
+  );
 
-  const { data: balances, isLoading: balancesLoading } = useQuery({
-    queryKey: ["leave-balances", currentYear],
-    queryFn: () =>
-      apiGet<PaginatedResponse<LeaveBalance> | LeaveBalance[]>(
-        `leave-balances?year=${currentYear}`
-      ),
-  });
+  const {
+    data: balanceList = [],
+    isLoading: balancesLoading,
+    isPending: balancesPending,
+    isError: balancesError,
+    refetch: refetchBalances,
+  } = useLeaveBalances({ year: currentYear }, { enabled: !!user });
 
   const { data: requests, isLoading: requestsLoading } = useQuery({
     queryKey: ["leave-requests"],
@@ -83,18 +50,25 @@ export default function LeaveDashboardPage() {
       apiGet<PaginatedResponse<LeaveRequest> | LeaveRequest[]>("leave-requests"),
   });
 
-  const balanceList: LeaveBalance[] = Array.isArray(balances)
-    ? balances
-    : balances?.results ?? [];
-
   const requestList: LeaveRequest[] = Array.isArray(requests)
     ? requests
     : requests?.results ?? [];
 
-  const annualBalance = balanceList.find((b) =>
-    b.leave_type.name.toLowerCase().includes("annual")
+  const recentRequests = useMemo(
+    () =>
+      [...requestList]
+        .sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+        .slice(0, 5),
+    [requestList]
   );
-  const totalUsed = balanceList.reduce((acc, b) => acc + b.used_days, 0);
+
+  const totalUsed = balanceList.reduce(
+    (acc, b) => acc + Number(b.used_days ?? 0),
+    0
+  );
   const pendingCount = requestList.filter((r) =>
     r.status.startsWith("PENDING")
   ).length;
@@ -104,130 +78,228 @@ export default function LeaveDashboardPage() {
     return r.start_date <= today && r.end_date >= today;
   }).length;
 
-  const isLoading = balancesLoading || requestsLoading;
+  const balancesBusy = authLoading || balancesLoading || balancesPending;
+  const showEmployee = recentRequests.some((row) => row.employee.id !== user?.id);
 
-  const tableRows = requestList.slice(0, 5).map((row) => {
+  const tableColumns = showEmployee
+    ? [
+        { key: "employee", label: "Employee" },
+        { key: "type", label: "Leave type" },
+        { key: "duration", label: "Duration" },
+        { key: "days", label: "Days", mono: true },
+        { key: "status", label: "Status" },
+      ]
+    : [
+        { key: "type", label: "Leave type" },
+        { key: "duration", label: "Duration" },
+        { key: "days", label: "Days", mono: true },
+        { key: "status", label: "Status" },
+      ];
+
+  const tableRows = recentRequests.map((row) => {
     const name = `${row.employee.first_name} ${row.employee.last_name}`;
-    return {
-      employee: (
-        <Link
-          href={`/leave/requests/${row.id}`}
-          className="flex items-center gap-3 hover:opacity-80"
-        >
-          <EmployeeAvatar name={name} />
-          <span className="font-medium text-on-surface">{name}</span>
-        </Link>
-      ),
-      type: (
-        <span className="text-on-surface-variant">{row.leave_type.name}</span>
-      ),
-      duration: (
-        <span className="text-on-surface-variant">
-          {formatLeaveDuration(row.start_date, row.end_date)}
-        </span>
-      ),
-      days: (
-        <span className="text-on-surface-variant">{row.total_working_days}</span>
-      ),
-      status: <StatusBadge status={row.status} />,
-      view: (
-        <Link
-          href={`/leave/requests/${row.id}`}
-          className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
-        >
-          <Eye className="h-3.5 w-3.5" aria-hidden />
-          View
-        </Link>
-      ),
-    };
+    const type = (
+      <span className="font-medium text-on-surface">{row.leave_type.name}</span>
+    );
+    const duration = (
+      <span className="text-on-surface-variant">
+        {formatLeaveDuration(row.start_date, row.end_date)}
+      </span>
+    );
+    const days = (
+      <span className="text-on-surface-variant">
+        {formatLeaveDays(row.total_working_days)}
+      </span>
+    );
+    const status = <StatusBadge status={row.status} />;
+
+    if (showEmployee) {
+      return {
+        employee: (
+          <span className="flex items-center gap-3">
+            <EmployeeAvatar name={name} />
+            <span className="font-medium text-on-surface">{name}</span>
+          </span>
+        ),
+        type,
+        duration,
+        days,
+        status,
+      };
+    }
+
+    return { type, duration, days, status };
   });
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-8">
       <PageHeader
+        className="mb-0"
         title="Leave Management"
-        subtitle="Track, apply, and manage leave across your organisation."
+        subtitle={
+          isApprover
+            ? "Your remaining days, requests that need a decision, and recent leave in your scope."
+            : "See remaining days, track your requests, and apply when you need time off."
+        }
         action={
           <span data-tour="leave-apply-btn">
-          <Button
-            nativeButton={false}
-            render={<Link href="/leave/apply" />}
-            size="lg"
-            className="rounded-xl px-6"
-          >
-            Apply for Leave
-          </Button>
+            <Button
+              nativeButton={false}
+              render={<Link href="/leave/apply" />}
+              size="lg"
+              className="rounded-xl px-6"
+            >
+              Apply for Leave
+            </Button>
           </span>
         }
       />
 
-      {isLoading ? (
-        <div
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
-          data-tour="leave-stats"
+      <section
+        className="space-y-4 pt-6"
+        aria-labelledby="leave-balances-heading"
+      >
+        <h2
+          id="leave-balances-heading"
+          className="text-title-sm font-semibold text-on-surface"
         >
-          {Array.from({ length: 4 }).map((_, i) => (
+          Leave balances
+        </h2>
+        <div data-tour="leave-balance-strip">
+          {balancesBusy ? (
+            <div className="h-36 animate-pulse rounded-xl bg-surface-container-high" />
+          ) : balancesError ? (
             <div
-              key={i}
-              className="h-28 animate-pulse rounded-xl bg-surface-container-high"
-            />
-          ))}
+              className="rounded-xl border border-outline-variant bg-surface-container-lowest px-6 py-8 text-center custom-shadow"
+              role="alert"
+            >
+              <p className="text-body-md text-on-surface">
+                Could not load your leave balances.
+              </p>
+              <p className="mt-1 text-body-md text-on-surface-variant">
+                Check your connection and try again. The rest of this page is
+                unaffected.
+              </p>
+              <button
+                type="button"
+                onClick={() => refetchBalances()}
+                className="mt-4 min-h-11 rounded-xl bg-primary-container px-6 py-3 text-body-md font-semibold text-on-primary hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Try again
+              </button>
+            </div>
+          ) : balanceList.length > 0 ? (
+            <LeaveBalanceStrip balances={balanceList} />
+          ) : (
+            <div className="rounded-xl border border-outline-variant bg-surface-container-lowest px-6 py-8 text-center custom-shadow">
+              <p className="text-body-md text-on-surface-variant">
+                No leave balances yet. They appear once HR allocates your
+                entitlement for {currentYear}.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {requestsLoading ? (
+        <div className="space-y-8">
+          <div
+            className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+            data-tour="leave-stats"
+          >
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-28 animate-pulse rounded-xl bg-surface-container-high"
+              />
+            ))}
+          </div>
+          <div className="h-56 animate-pulse rounded-xl bg-surface-container-high" />
         </div>
       ) : (
         <>
-          <div
-            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
-            data-tour="leave-stats"
+          <section
+            className="space-y-4"
+            aria-labelledby="leave-snapshot-heading"
           >
-            <StatCard
-              label="Annual Leave Balance"
-              value={String(annualBalance?.remaining_days ?? 0)}
-              icon={<CalendarDays />}
-              trend="days remaining"
-            />
-            <StatCard
-              label="Leave Taken This Year"
-              value={String(totalUsed)}
-              icon={<CheckCircle />}
-              trend="days"
-            />
-            <StatCard
-              label="Pending Requests"
-              value={String(pendingCount)}
-              icon={<Clock />}
-              trend="requests"
-              accent="warning"
-            />
-            <StatCard
-              label="On Leave Today"
-              value={String(onLeaveToday)}
-              icon={<Users />}
-              trend="staff"
-            />
-          </div>
+            <h2
+              id="leave-snapshot-heading"
+              className="text-title-sm font-semibold text-on-surface"
+            >
+              This year
+            </h2>
+            <div
+              className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+              data-tour="leave-stats"
+            >
+              <StatCard
+                label="Leave taken this year"
+                value={formatLeaveDays(totalUsed)}
+                icon={<CheckCircle />}
+                trend="days"
+                href="/leave/history"
+              />
+              <StatCard
+                label="Pending requests"
+                value={String(pendingCount)}
+                icon={<Clock />}
+                trend="awaiting a decision"
+                accent="warning"
+                href={isApprover ? "/leave/admin" : "/leave/history"}
+              />
+              <StatCard
+                label="On leave today"
+                value={String(onLeaveToday)}
+                icon={<Users />}
+                trend="staff"
+                href="/leave/calendar"
+              />
+            </div>
+          </section>
 
-          <div data-tour="leave-balance-strip">
-            <LeaveBalanceStrip balances={balanceList} />
-          </div>
-
-          <DataTable
-            columns={TABLE_COLUMNS}
-            rows={tableRows}
-            emptyMessage="No leave requests found."
-            header={
-              <div className="flex items-center justify-between px-6 py-3">
-                <h2 className="text-base font-semibold text-on-surface">
-                  Recent Leave Requests
-                </h2>
-                <Link
-                  href="/leave/requests"
-                  className="flex items-center gap-1 text-sm font-semibold text-primary-container hover:underline"
-                >
-                  View All <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            }
-          />
+          <section aria-labelledby="leave-recent-heading">
+            <DataTable
+              columns={tableColumns}
+              rows={tableRows}
+              getRowHref={(i) => `/leave/requests/${recentRequests[i].id}`}
+              getRowLabel={(i) => {
+                const row = recentRequests[i];
+                const name = `${row.employee.first_name} ${row.employee.last_name}`;
+                return `View ${row.leave_type.name} request for ${name}`;
+              }}
+              emptyMessage={
+                isApprover ? (
+                  "No leave requests in your scope yet."
+                ) : (
+                  <span className="inline-flex flex-col items-center gap-3">
+                    <span>You have not applied for leave yet.</span>
+                    <Link
+                      href="/leave/apply"
+                      className="font-semibold text-primary-container hover:underline"
+                    >
+                      Apply for leave
+                    </Link>
+                  </span>
+                )
+              }
+              header={
+                <div className="flex items-center justify-between gap-4 px-6 py-4">
+                  <h2
+                    id="leave-recent-heading"
+                    className="text-title-sm font-semibold text-on-surface"
+                  >
+                    Recent leave requests
+                  </h2>
+                  <Link
+                    href={isApprover ? "/leave/requests" : "/leave/history"}
+                    className="inline-flex min-h-11 items-center gap-1 text-body-md font-semibold text-primary-container hover:underline"
+                  >
+                    View all <ArrowRight className="h-4 w-4" aria-hidden />
+                  </Link>
+                </div>
+              }
+            />
+          </section>
         </>
       )}
     </div>
