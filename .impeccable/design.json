@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-22T11:41:00.000Z",
+  "title": "Design System: Incel Group HR Portal",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Incel Indigo",
+        "canonical": "#000a76",
+        "tonalRamp": ["#000433", "#000767", "#000a76", "#111fa2", "#2935b2", "#4350ca", "#8c96ff", "#dfe0ff"]
+      },
+      "primary-container": {
+        "role": "primary",
+        "displayName": "Action Indigo",
+        "canonical": "#111fa2",
+        "tonalRamp": ["#000767", "#000a76", "#111fa2", "#2935b2", "#4350ca", "#8c96ff", "#bdc2ff", "#dfe0ff"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Cool Paper",
+        "canonical": "#f9f9ff",
+        "tonalRamp": ["#111c2d", "#263143", "#454654", "#767685", "#c6c5d6", "#d8e3fb", "#e7eeff", "#f9f9ff"]
+      },
+      "surface-container-low": {
+        "role": "neutral",
+        "displayName": "Tinted Tray",
+        "canonical": "#f0f3ff",
+        "tonalRamp": ["#1a2435", "#263143", "#454654", "#c6c5d6", "#d8e3fb", "#dee8ff", "#e7eeff", "#f0f3ff"]
+      },
+      "surface-container-lowest": {
+        "role": "neutral",
+        "displayName": "Card White",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#0d1520", "#111c2d", "#263143", "#c6c5d6", "#d8e3fb", "#e7eeff", "#f0f3ff", "#ffffff"]
+      },
+      "on-surface": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#111c2d",
+        "tonalRamp": ["#0d1520", "#111c2d", "#263143", "#454654", "#767685", "#c6c5d6", "#ecf1ff", "#f9f9ff"]
+      },
+      "secondary": {
+        "role": "secondary",
+        "displayName": "Workspace Mauve",
+        "canonical": "#655b68",
+        "tonalRamp": ["#201924", "#4d4450", "#655b68", "#6b616e", "#cfc2d2", "#ecdeee", "#f3e5f5", "#faf7fb"]
+      },
+      "secondary-container": {
+        "role": "secondary",
+        "displayName": "Mauve Tint",
+        "canonical": "#ecdeee",
+        "tonalRamp": ["#201924", "#4d4450", "#655b68", "#cfc2d2", "#ecdeee", "#f3e5f5", "#faf7fb", "#ffffff"]
+      },
+      "error": {
+        "role": "error",
+        "displayName": "Reject Red",
+        "canonical": "#ba1a1a",
+        "tonalRamp": ["#410002", "#93000a", "#ba1a1a", "#ffb4ab", "#ffdad6", "#ffedea", "#fff8f7", "#ffffff"]
+      },
+      "status-pending-bg": {
+        "role": "neutral",
+        "displayName": "Pending Amber",
+        "canonical": "#fef3c7",
+        "tonalRamp": ["#78350f", "#b45309", "#d97706", "#fbbf24", "#fcd34d", "#fde68a", "#fef3c7", "#fffbeb"]
+      }
+    },
+    "typographyMeta": {
+      "display-lg": { "displayName": "Display LG", "purpose": "Auth brand headlines only." },
+      "headline-lg": { "displayName": "Headline LG", "purpose": "Rare module titles." },
+      "headline-md": { "displayName": "Headline MD", "purpose": "Page titles and sidebar wordmark." },
+      "title-sm": { "displayName": "Title SM", "purpose": "Card and section titles." },
+      "body-lg": { "displayName": "Body LG", "purpose": "Comfortable reading copy." },
+      "body-md": { "displayName": "Body MD", "purpose": "Default app copy, nav items, prose tables." },
+      "label-md": { "displayName": "Label MD", "purpose": "Field labels, uppercase section tags, captions." },
+      "data-table": { "displayName": "Data Table", "purpose": "Money, IDs, balances, repayment grids." },
+      "brand-serif": { "displayName": "Brand Serif", "purpose": "Login/register brand panel headlines only. Never in authenticated chrome." }
+    },
+    "shadows": [
+      {
+        "name": "custom-shadow",
+        "value": "0 10px 15px -3px rgb(0 10 118 / 0.05), 0 4px 6px -2px rgb(0 10 118 / 0.03)",
+        "purpose": "Level 2 cards at rest."
+      },
+      {
+        "name": "ambient-shadow",
+        "value": "0 10px 30px -10px hsl(240 4% 60% / 0.18)",
+        "purpose": "Level 3 dialogs and popovers."
+      },
+      {
+        "name": "shadow-sm",
+        "value": "0 1px 2px 0 rgb(0 10 118 / 0.04)",
+        "purpose": "Quiet lift on compact controls."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Default easing for color, opacity, and border transitions."
+      },
+      {
+        "name": "duration-fast",
+        "value": "200ms",
+        "purpose": "Hover and focus state changes."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Filled action indigo CTA for submit, approve, and primary page actions.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Request Leave</button>",
+      "css": ".ds-btn-primary { background: var(--primary-container, #111fa2); color: var(--on-primary, #ffffff); padding: 12px 24px; border: none; border-radius: 1.5rem; font-family: 'Plus Jakarta Sans', ui-sans-serif, sans-serif; font-size: 14px; font-weight: 600; line-height: 1.6; cursor: pointer; box-shadow: 0 1px 2px 0 rgb(0 10 118 / 0.04); transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-primary:hover { opacity: 0.9; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring, #111fa2) 50%, transparent); } .ds-btn-primary:active { transform: scale(0.99); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action with indigo text and no fill.",
+      "html": "<button class=\"ds-btn-ghost\" type=\"button\">Cancel</button>",
+      "css": ".ds-btn-ghost { background: transparent; color: var(--primary, #000a76); padding: 12px 24px; border: 1px solid var(--outline-variant, #c6c5d6); border-radius: 1.5rem; font-family: 'Plus Jakarta Sans', ui-sans-serif, sans-serif; font-size: 14px; font-weight: 600; line-height: 1.6; cursor: pointer; transition: background 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-ghost:hover { background: var(--muted, #f0f3ff); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring, #111fa2) 50%, transparent); }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Borderless cool-tray well with a 2px action-indigo focus ring.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Start date</span><input class=\"ds-input\" type=\"text\" placeholder=\"Select dates\" /></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; font-family: 'Plus Jakarta Sans', ui-sans-serif, sans-serif; } .ds-field-label { font-size: 12px; font-weight: 500; line-height: 1.4; letter-spacing: 0.01em; color: var(--on-surface-variant, #454654); } .ds-input { width: 100%; border: none; border-radius: 1.5rem; background: var(--surface-container-low, #f0f3ff); color: var(--on-surface, #111c2d); padding: 12px 16px; font-size: 14px; line-height: 1.6; } .ds-input::placeholder { color: var(--on-surface-variant, #454654); } .ds-input:focus { outline: none; box-shadow: 0 0 0 2px var(--primary-container, #111fa2); } .ds-input:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--primary-container, #111fa2); }"
+    },
+    {
+      "name": "Workspace Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Raised work surface for request summaries, stats, and settings groups.",
+      "html": "<article class=\"ds-card\"><p class=\"ds-card-label\">Annual leave</p><p class=\"ds-card-value\">12</p><p class=\"ds-card-meta\">days remaining</p></article>",
+      "css": ".ds-card { background: var(--surface-container-lowest, #ffffff); color: var(--on-surface, #111c2d); border: 1px solid var(--outline-variant, #c6c5d6); border-radius: 1.5rem; padding: 16px; box-shadow: 0 10px 15px -3px rgb(0 10 118 / 0.05), 0 4px 6px -2px rgb(0 10 118 / 0.03); font-family: 'Plus Jakarta Sans', ui-sans-serif, sans-serif; transition: border-color 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-card:hover { border-color: color-mix(in srgb, var(--primary, #000a76) 30%, var(--outline-variant, #c6c5d6)); } .ds-card-label { margin: 0 0 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--on-surface-variant, #454654); } .ds-card-value { margin: 0; font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; } .ds-card-meta { margin: 4px 0 0; font-size: 14px; color: var(--on-surface-variant, #454654); }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "status-badge",
+      "description": "Pill that encodes workflow state. Pending stages share amber.",
+      "html": "<span class=\"ds-badge ds-badge-pending\">Pending HR</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; border-radius: 9999px; padding: 4px 12px; font-family: 'Plus Jakarta Sans', ui-sans-serif, sans-serif; font-size: 10px; font-weight: 700; line-height: 1.4; letter-spacing: 0.04em; text-transform: uppercase; } .ds-badge-pending { background: #fef3c7; color: #b45309; } .ds-badge-approved { background: #dcfce7; color: #15803d; } .ds-badge-rejected { background: #fee2e2; color: #b91c1c; }"
+    },
+    {
+      "name": "Sidebar Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Active module row with a 4px action-indigo bar and mauve tint.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Leave Management navigation\"><a class=\"ds-nav-item is-active\" href=\"#\"><svg class=\"ds-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/></svg>Leave Dashboard</a><a class=\"ds-nav-item\" href=\"#\"><svg class=\"ds-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg>Apply for Leave</a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; background: var(--surface-container-low, #f0f3ff); width: 256px; font-family: 'Plus Jakarta Sans', ui-sans-serif, sans-serif; } .ds-nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-left: 4px solid transparent; color: var(--on-surface-variant, #454654); text-decoration: none; font-size: 14px; line-height: 1.6; transition: background 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-nav-item:hover { background: var(--surface-container-highest, #d8e3fb); } .ds-nav-item.is-active { border-left-color: var(--primary-container, #111fa2); background: var(--secondary-container, #ecdeee); color: var(--on-surface, #111c2d); font-weight: 700; } .ds-nav-item:focus-visible { outline: 2px solid var(--ring, #111fa2); outline-offset: -2px; } .ds-nav-icon { width: 20px; height: 20px; flex-shrink: 0; }"
+    },
+    {
+      "name": "Approval Timeline",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Signature vertical approval chain: completed, active (pulse), upcoming.",
+      "html": "<div class=\"ds-timeline\"><h3 class=\"ds-timeline-title\">Approval Chain</h3><ol class=\"ds-timeline-list\"><li class=\"ds-step is-done\"><span class=\"ds-node\" aria-hidden=\"true\"><svg viewBox=\"0 0 24 24\" width=\"10\" height=\"10\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\"><path d=\"M5 12l4 4 10-10\"/></svg></span><span><strong>Line Manager</strong><small>Approved</small></span></li><li class=\"ds-step is-active\"><span class=\"ds-node\" aria-hidden=\"true\"></span><span><strong>HR</strong><small>Awaiting review</small></span></li><li class=\"ds-step\"><span class=\"ds-node\" aria-hidden=\"true\"></span><span><strong>Executive Director</strong><small>Upcoming</small></span></li></ol></div>",
+      "css": ".ds-timeline { background: var(--surface-container-lowest, #ffffff); border: 1px solid var(--outline-variant, #c6c5d6); border-radius: 1.5rem; padding: 24px; box-shadow: 0 10px 15px -3px rgb(0 10 118 / 0.05), 0 4px 6px -2px rgb(0 10 118 / 0.03); font-family: 'Plus Jakarta Sans', ui-sans-serif, sans-serif; color: var(--on-surface, #111c2d); } .ds-timeline-title { margin: 0 0 24px; font-size: 18px; font-weight: 600; } .ds-timeline-list { list-style: none; margin: 0; padding: 0 0 0 16px; position: relative; } .ds-timeline-list::before { content: ''; position: absolute; left: 11px; top: 8px; bottom: 8px; width: 2px; background: var(--outline-variant, #c6c5d6); } .ds-step { display: flex; align-items: flex-start; gap: 16px; position: relative; margin-bottom: 32px; } .ds-step:last-child { margin-bottom: 0; } .ds-step strong { display: block; font-size: 14px; } .ds-step small { display: block; font-size: 12px; color: var(--on-surface-variant, #454654); } .ds-node { z-index: 1; width: 20px; height: 20px; margin-top: 4px; border-radius: 9999px; border: 4px solid var(--outline-variant, #c6c5d6); background: var(--surface, #f9f9ff); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--on-primary, #ffffff); } .ds-step.is-done .ds-node { border-color: var(--primary-container, #111fa2); background: var(--primary-container, #111fa2); } .ds-step.is-active .ds-node { border-color: var(--primary-container, #111fa2); animation: ds-pulse 1.4s ease-in-out infinite; } .ds-step:not(.is-done):not(.is-active) strong { color: var(--on-surface-variant, #454654); } @keyframes ds-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary-container, #111fa2) 35%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary-container, #111fa2) 0%, transparent); } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Inviting Digital Workspace",
+    "overview": "This is an Operate surface for Incel Group HR: leave, loans, appraisals, and the people data around them. The world is a hybrid of Corporate Modernism and Soft Minimalism — deep indigo authority on a cool, paper-like field, with generous radius and whitespace so multi-stage approval never feels like a factory floor.\n\nThe system is built on trust, precision, and approachability. Brand lives in the lockup, the indigo, and the hyper-rounded cards — not in decoration. Scanability, status literacy, and native form behavior outrank expression. Authenticated chrome is Plus Jakarta Sans; the login/register brand panel may use Lora for the headline only.",
+    "keyCharacteristics": [
+      "Cool indigo surfaces (`surface` family), never warm stone greys",
+      "Fixed 256px sidebar + fluid content",
+      "Hyper-rounded containers (cards and primary actions at `rounded.xl`)",
+      "Ambient, indigo-tinted shadows instead of heavy borders",
+      "Pill status badges that make the approval chain readable at a glance",
+      "JetBrains Mono only for money, IDs, and tabular data"
+    ],
+    "rules": [
+      { "name": "The One Indigo Rule", "body": "Large fills of `primary` belong on the unauthenticated brand panel. Inside the app, filled actions use `primary-container`; the rest of the screen stays in the surface ladder.", "section": "colors" },
+      { "name": "The Cool Field Rule", "body": "Backgrounds stay in the indigo-tinted surface tokens. Do not introduce warm grey, stone, or beige canvases from older drafts.", "section": "colors" },
+      { "name": "The Workhorse Rule", "body": "Plus Jakarta Sans is the interface. Lora does not appear in authenticated HR chrome.", "section": "typography" },
+      { "name": "The Ledger Rule", "body": "Money, employee IDs, and repayment grids use JetBrains Mono (or `tabular-nums` on the same role). Prose never does.", "section": "typography" },
+      { "name": "The Flat-Until-Lifted Rule", "body": "Surfaces rest on tone. Shadow appears to hold a card or a modal, not to decorate a row.", "section": "elevation" },
+      { "name": "The Contained Workspace Rule", "body": "Primary containers (cards, dialogs, brand tiles) keep the large radius. Tiny chips and icon buttons may tighten; they must not go square.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do keep new HR screens in the cool indigo surface ladder and Plus Jakarta Sans.",
+      "Do show the approval chain and status pill on every request detail.",
+      "Do use JetBrains Mono (or tabular nums) for loan amounts, installments, and IDs.",
+      "Do collapse the sidebar to a drawer below `lg`; keep the 256px rail on desktop.",
+      "Do design Appraisals, dashboards, payroll viewing, and attendance to inherit this world — same shell, same radius, same status language."
+    ],
+    "donts": [
+      "Don't restyle the app in warm grey / stone from an older Stitch prose draft; tokens in this file and `app/globals.css` win.",
+      "Don't introduce a second display font inside authenticated chrome.",
+      "Don't use heavy black drop shadows, neon glow, or glassmorphism.",
+      "Don't hide policy failures in toasts-only patterns; blocking validation belongs next to the field.",
+      "Don't drop Appraisals out of module navigation because the API is unbuilt.",
+      "Don't put marketing illustration or testimonial chrome on operate screens."
+    ]
+  }
+}

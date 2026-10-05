@@ -1,10 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useId } from "react";
+import { FieldLabel } from "@/components/hrm/forms/FieldLabel";
 import { stitchFieldClass, stitchSelectClass } from "@/lib/design/field-styles";
+import {
+  accrualMethodLabel,
+  overlapEnforcementLabel,
+  relieverScopeLabel,
+} from "@/lib/leave/settings-labels";
 import type { LeavePolicyWritePayload, LeaveType, RelieverScope } from "@/lib/types/leave";
 
 const SCOPES: RelieverScope[] = ["AUTO", "TEAM", "UNIT", "DEPARTMENT", "ORGANIZATION"];
+const ACCRUAL_METHODS = ["UPFRONT", "MONTHLY", "WEEKLY", "ANNIVERSARY"] as const;
 
 export const emptyPolicyForm = (leaveTypeId = ""): LeavePolicyWritePayload => ({
   name: "",
@@ -89,28 +96,36 @@ export function policyToForm(p: {
   };
 }
 
-function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <label className="mb-1.5 block text-label-md text-on-surface-variant">{children}</label>
-  );
-}
-
 function Check({
+  id,
   label,
   checked,
   onChange,
   disabled,
+  hint,
 }: {
+  id: string;
   label: string;
   checked: boolean;
   onChange: (v: boolean) => void;
   disabled?: boolean;
+  hint?: string;
 }) {
   return (
-    <label className="flex items-center gap-2 text-sm">
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
-      {label}
-    </label>
+    <div>
+      <label htmlFor={id} className="flex min-h-11 items-center gap-2 text-body-md text-on-surface">
+        <input
+          id={id}
+          type="checkbox"
+          className="h-4 w-4 accent-primary"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        {label}
+      </label>
+      {hint ? <p className="ml-6 text-body-md text-on-surface-variant">{hint}</p> : null}
+    </div>
   );
 }
 
@@ -127,137 +142,328 @@ export function PolicyForm({
   lockLeaveType?: boolean;
   readOnly?: boolean;
 }) {
+  const formId = useId();
   const patch = (partial: Partial<LeavePolicyWritePayload>) => setForm({ ...form, ...partial });
 
   return (
     <div className="space-y-8">
       <section className="space-y-4">
-        <h3 className="text-sm font-semibold">Identity</h3>
+        <h3 className="text-title-sm font-semibold text-on-surface">Identity</h3>
         <div>
-          <Label>Name</Label>
-          <input className={stitchFieldClass} disabled={readOnly} value={form.name ?? ""} onChange={(e) => patch({ name: e.target.value })} />
+          <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
+          <input
+            id={`${formId}-name`}
+            className={stitchFieldClass}
+            disabled={readOnly}
+            value={form.name ?? ""}
+            autoComplete="off"
+            onChange={(e) => patch({ name: e.target.value })}
+          />
         </div>
         <div>
-          <Label>Leave type</Label>
-          <select className={stitchSelectClass} disabled={readOnly || lockLeaveType} value={form.leave_type ?? ""} onChange={(e) => patch({ leave_type: e.target.value })}>
+          <FieldLabel htmlFor={`${formId}-type`}>Leave type</FieldLabel>
+          <select
+            id={`${formId}-type`}
+            className={stitchSelectClass}
+            disabled={readOnly || lockLeaveType}
+            value={form.leave_type ?? ""}
+            onChange={(e) => patch({ leave_type: e.target.value })}
+          >
             <option value="">Select type</option>
             {types.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
             ))}
           </select>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label>Annual entitlement</Label>
-            <input type="number" className={stitchFieldClass} disabled={readOnly} value={form.annual_entitlement ?? 0}
-              onChange={(e) => patch({ annual_entitlement: Number(e.target.value) })} />
+            <FieldLabel htmlFor={`${formId}-entitlement`}>Annual entitlement (days)</FieldLabel>
+            <input
+              id={`${formId}-entitlement`}
+              type="number"
+              min={0}
+              className={stitchFieldClass}
+              disabled={readOnly}
+              value={form.annual_entitlement ?? 0}
+              onChange={(e) => patch({ annual_entitlement: Number(e.target.value) })}
+            />
           </div>
           <div>
-            <Label>Effective from</Label>
-            <input type="date" className={stitchFieldClass} disabled={readOnly} value={form.effective_from ?? ""}
-              onChange={(e) => patch({ effective_from: e.target.value || null })} />
+            <FieldLabel htmlFor={`${formId}-from`} optional>
+              Effective from
+            </FieldLabel>
+            <input
+              id={`${formId}-from`}
+              type="date"
+              lang="en-GB"
+              className={stitchFieldClass}
+              disabled={readOnly}
+              value={form.effective_from ?? ""}
+              onChange={(e) => patch({ effective_from: e.target.value || null })}
+            />
           </div>
           <div>
-            <Label>Effective to</Label>
-            <input type="date" className={stitchFieldClass} disabled={readOnly} value={form.effective_to ?? ""}
-              onChange={(e) => patch({ effective_to: e.target.value || null })} />
+            <FieldLabel htmlFor={`${formId}-to`} optional>
+              Effective to
+            </FieldLabel>
+            <input
+              id={`${formId}-to`}
+              type="date"
+              lang="en-GB"
+              className={stitchFieldClass}
+              disabled={readOnly}
+              value={form.effective_to ?? ""}
+              onChange={(e) => patch({ effective_to: e.target.value || null })}
+            />
           </div>
           <div>
-            <Label>Maximum backdate days</Label>
-            <input type="number" className={stitchFieldClass} disabled={readOnly} value={form.maximum_backdate_days ?? ""}
-              onChange={(e) => patch({ maximum_backdate_days: e.target.value === "" ? null : Number(e.target.value) })} />
+            <FieldLabel htmlFor={`${formId}-backdate`} optional>
+              Maximum backdate days
+            </FieldLabel>
+            <input
+              id={`${formId}-backdate`}
+              type="number"
+              min={0}
+              className={stitchFieldClass}
+              disabled={readOnly}
+              value={form.maximum_backdate_days ?? ""}
+              onChange={(e) =>
+                patch({
+                  maximum_backdate_days: e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+            />
           </div>
         </div>
-        <Check label="Weekend excluded" checked={!!form.weekend_excluded} disabled={readOnly} onChange={(v) => patch({ weekend_excluded: v })} />
-        <Check label="Public holiday excluded" checked={!!form.public_holiday_excluded} disabled={readOnly} onChange={(v) => patch({ public_holiday_excluded: v })} />
-        <Check label="Allow backdated requests" checked={!!form.allow_backdated} disabled={readOnly} onChange={(v) => patch({ allow_backdated: v })} />
+        <Check
+          id={`${formId}-weekend`}
+          label="Exclude weekends from working-day counts"
+          checked={!!form.weekend_excluded}
+          disabled={readOnly}
+          onChange={(v) => patch({ weekend_excluded: v })}
+        />
+        <Check
+          id={`${formId}-holiday`}
+          label="Exclude public holidays from working-day counts"
+          checked={!!form.public_holiday_excluded}
+          disabled={readOnly}
+          onChange={(v) => patch({ public_holiday_excluded: v })}
+        />
+        <Check
+          id={`${formId}-backdated`}
+          label="Allow backdated requests"
+          checked={!!form.allow_backdated}
+          disabled={readOnly}
+          onChange={(v) => patch({ allow_backdated: v })}
+        />
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold">Half-day & staffing</h3>
-        <Check label="Half-day allowed" checked={!!form.half_day_allowed} disabled={readOnly} onChange={(v) => patch({ half_day_allowed: v })} />
-        <Check label="Reliever required" checked={!!form.reliever_required} disabled={readOnly} onChange={(v) => patch({ reliever_required: v })} />
+        <h3 className="text-title-sm font-semibold text-on-surface">Half-day and staffing</h3>
+        <Check
+          id={`${formId}-half`}
+          label="Half-day allowed"
+          checked={!!form.half_day_allowed}
+          disabled={readOnly}
+          onChange={(v) => patch({ half_day_allowed: v })}
+          hint="Phase 1 policy usually keeps this off."
+        />
+        <Check
+          id={`${formId}-reliever`}
+          label="Reliever required"
+          checked={!!form.reliever_required}
+          disabled={readOnly}
+          onChange={(v) => patch({ reliever_required: v })}
+        />
         <div>
-          <Label>Reliever scope</Label>
-          <select className={stitchSelectClass} disabled={readOnly} value={form.reliever_scope ?? "AUTO"} onChange={(e) => patch({ reliever_scope: e.target.value as RelieverScope })}>
-            {SCOPES.map((s) => <option key={s}>{s}</option>)}
+          <FieldLabel htmlFor={`${formId}-reliever-scope`}>Reliever scope</FieldLabel>
+          <select
+            id={`${formId}-reliever-scope`}
+            className={stitchSelectClass}
+            disabled={readOnly}
+            value={form.reliever_scope ?? "AUTO"}
+            onChange={(e) => patch({ reliever_scope: e.target.value as RelieverScope })}
+          >
+            {SCOPES.map((s) => (
+              <option key={s} value={s}>
+                {relieverScopeLabel(s)}
+              </option>
+            ))}
           </select>
         </div>
-        <Check label="Overlap control enabled" checked={!!form.overlap_control_enabled} disabled={readOnly} onChange={(v) => patch({ overlap_control_enabled: v })} />
-        <p className="text-xs text-muted-foreground">
-          Block matches today’s Annual/Casual rule (one other person already off in the same team/unit/department). Warn records the conflict but still allows submit.
-        </p>
+        <Check
+          id={`${formId}-overlap`}
+          label="Limit how many people can be off at once"
+          checked={!!form.overlap_control_enabled}
+          disabled={readOnly}
+          onChange={(v) => patch({ overlap_control_enabled: v })}
+          hint="Block matches today’s Annual/Casual rule (one other person already off in the same team, unit, or department). Warn records the conflict but still allows submit."
+        />
         <div>
-          <Label>Overlap scope</Label>
-          <select className={stitchSelectClass} disabled={readOnly} value={form.overlap_scope ?? "AUTO"} onChange={(e) => patch({ overlap_scope: e.target.value as RelieverScope })}>
-            {SCOPES.map((s) => <option key={s}>{s}</option>)}
+          <FieldLabel htmlFor={`${formId}-overlap-scope`}>Overlap scope</FieldLabel>
+          <select
+            id={`${formId}-overlap-scope`}
+            className={stitchSelectClass}
+            disabled={readOnly}
+            value={form.overlap_scope ?? "AUTO"}
+            onChange={(e) => patch({ overlap_scope: e.target.value as RelieverScope })}
+          >
+            {SCOPES.map((s) => (
+              <option key={s} value={s}>
+                {relieverScopeLabel(s)}
+              </option>
+            ))}
           </select>
         </div>
         <div>
-          <Label>Maximum people absent</Label>
-          <input type="number" className={stitchFieldClass} disabled={readOnly} value={form.maximum_people_absent ?? 1}
-            onChange={(e) => patch({ maximum_people_absent: Number(e.target.value) })} />
+          <FieldLabel htmlFor={`${formId}-max-absent`}>Maximum people absent</FieldLabel>
+          <input
+            id={`${formId}-max-absent`}
+            type="number"
+            min={1}
+            className={stitchFieldClass}
+            disabled={readOnly}
+            value={form.maximum_people_absent ?? 1}
+            onChange={(e) => patch({ maximum_people_absent: Number(e.target.value) })}
+          />
         </div>
         <div>
-          <Label>Overlap enforcement</Label>
-          <select className={stitchSelectClass} disabled={readOnly} value={form.overlap_enforcement ?? "BLOCK"}
-            onChange={(e) => patch({ overlap_enforcement: e.target.value as "BLOCK" | "WARN" })}>
-            <option value="BLOCK">BLOCK</option>
-            <option value="WARN">WARN</option>
+          <FieldLabel htmlFor={`${formId}-enforcement`}>Overlap enforcement</FieldLabel>
+          <select
+            id={`${formId}-enforcement`}
+            className={stitchSelectClass}
+            disabled={readOnly}
+            value={form.overlap_enforcement ?? "BLOCK"}
+            onChange={(e) =>
+              patch({ overlap_enforcement: e.target.value as "BLOCK" | "WARN" })
+            }
+          >
+            <option value="BLOCK">{overlapEnforcementLabel("BLOCK")}</option>
+            <option value="WARN">{overlapEnforcementLabel("WARN")}</option>
           </select>
         </div>
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold">Accrual</h3>
+        <h3 className="text-title-sm font-semibold text-on-surface">Accrual</h3>
         <div>
-          <Label>Accrual method</Label>
-          <select className={stitchSelectClass} disabled={readOnly} value={form.accrual_method ?? "UPFRONT"}
-            onChange={(e) => patch({ accrual_method: e.target.value as LeavePolicyWritePayload["accrual_method"] })}>
-            <option>UPFRONT</option>
-            <option>MONTHLY</option>
-            <option>WEEKLY</option>
-            <option>ANNIVERSARY</option>
+          <FieldLabel htmlFor={`${formId}-accrual`}>Accrual method</FieldLabel>
+          <select
+            id={`${formId}-accrual`}
+            className={stitchSelectClass}
+            disabled={readOnly}
+            value={form.accrual_method ?? "UPFRONT"}
+            onChange={(e) =>
+              patch({
+                accrual_method: e.target.value as LeavePolicyWritePayload["accrual_method"],
+              })
+            }
+          >
+            {ACCRUAL_METHODS.map((m) => (
+              <option key={m} value={m}>
+                {accrualMethodLabel(m)}
+              </option>
+            ))}
           </select>
         </div>
         <div>
-          <Label>Accrual rate (optional)</Label>
-          <input className={stitchFieldClass} disabled={readOnly} value={form.accrual_rate ?? ""}
-            onChange={(e) => patch({ accrual_rate: e.target.value || null })} />
+          <FieldLabel htmlFor={`${formId}-rate`} optional>
+            Accrual rate
+          </FieldLabel>
+          <input
+            id={`${formId}-rate`}
+            className={stitchFieldClass}
+            disabled={readOnly}
+            value={form.accrual_rate ?? ""}
+            onChange={(e) => patch({ accrual_rate: e.target.value || null })}
+          />
         </div>
-        <Check label="Prorate new joiners" checked={!!form.prorate_new_joiners} disabled={readOnly} onChange={(v) => patch({ prorate_new_joiners: v })} />
+        <Check
+          id={`${formId}-prorate`}
+          label="Prorate new joiners"
+          checked={!!form.prorate_new_joiners}
+          disabled={readOnly}
+          onChange={(v) => patch({ prorate_new_joiners: v })}
+        />
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold">Year-end</h3>
-        <Check label="Carry forward unused days" checked={!!form.carry_forward} disabled={readOnly} onChange={(v) => patch({ carry_forward: v })} />
-        {!form.carry_forward && (
-          <p className="text-xs text-muted-foreground">Unused days expire at year-end (ledgered EXPIRY).</p>
-        )}
+        <h3 className="text-title-sm font-semibold text-on-surface">Year-end</h3>
+        <Check
+          id={`${formId}-carry`}
+          label="Carry forward unused days"
+          checked={!!form.carry_forward}
+          disabled={readOnly}
+          onChange={(v) => patch({ carry_forward: v })}
+        />
+        {!form.carry_forward ? (
+          <p className="text-body-md text-on-surface-variant">
+            Unused days expire at year-end.
+          </p>
+        ) : null}
         <div>
-          <Label>Carry-forward max days</Label>
-          <input className={stitchFieldClass} disabled={readOnly} value={form.carry_forward_max_days ?? ""}
-            onChange={(e) => patch({ carry_forward_max_days: e.target.value || null })} />
+          <FieldLabel htmlFor={`${formId}-carry-max`} optional>
+            Carry-forward max days
+          </FieldLabel>
+          <input
+            id={`${formId}-carry-max`}
+            className={stitchFieldClass}
+            disabled={readOnly}
+            value={form.carry_forward_max_days ?? ""}
+            onChange={(e) => patch({ carry_forward_max_days: e.target.value || null })}
+          />
         </div>
         <div>
-          <Label>Carry-forward expiry months</Label>
-          <input type="number" className={stitchFieldClass} disabled={readOnly} value={form.carry_forward_expiry_months ?? ""}
-            onChange={(e) => patch({ carry_forward_expiry_months: e.target.value === "" ? null : Number(e.target.value) })} />
+          <FieldLabel htmlFor={`${formId}-carry-expiry`} optional>
+            Carry-forward expiry months
+          </FieldLabel>
+          <input
+            id={`${formId}-carry-expiry`}
+            type="number"
+            min={0}
+            className={stitchFieldClass}
+            disabled={readOnly}
+            value={form.carry_forward_expiry_months ?? ""}
+            onChange={(e) =>
+              patch({
+                carry_forward_expiry_months:
+                  e.target.value === "" ? null : Number(e.target.value),
+              })
+            }
+          />
         </div>
-        <Check label="Forfeit unused when carry-forward is off" checked={!!form.forfeit_unused} disabled={readOnly} onChange={(v) => patch({ forfeit_unused: v })} />
-        <Check label="Forfeit remaining days on resignation" checked={!!form.forfeited_on_resignation} disabled={readOnly} onChange={(v) => patch({ forfeited_on_resignation: v })} />
+        <Check
+          id={`${formId}-forfeit-unused`}
+          label="Forfeit unused when carry-forward is off"
+          checked={!!form.forfeit_unused}
+          disabled={readOnly}
+          onChange={(v) => patch({ forfeit_unused: v })}
+        />
+        <Check
+          id={`${formId}-forfeit-resign`}
+          label="Forfeit remaining days on resignation"
+          checked={!!form.forfeited_on_resignation}
+          disabled={readOnly}
+          onChange={(v) => patch({ forfeited_on_resignation: v })}
+        />
       </section>
 
-      {!readOnly && (
+      {!readOnly ? (
         <div>
-          <Label>Reason (audit)</Label>
-          <input className={stitchFieldClass} value={form.reason ?? ""} onChange={(e) => patch({ reason: e.target.value })} />
+          <FieldLabel htmlFor={`${formId}-reason`} optional>
+            Note for the audit log
+          </FieldLabel>
+          <input
+            id={`${formId}-reason`}
+            className={stitchFieldClass}
+            value={form.reason ?? ""}
+            autoComplete="off"
+            onChange={(e) => patch({ reason: e.target.value })}
+          />
         </div>
-      )}
+      ) : null}
     </div>
   );
-}
-
-export function usePolicyFormState(initial: LeavePolicyWritePayload) {
-  return useState<LeavePolicyWritePayload>(initial);
 }

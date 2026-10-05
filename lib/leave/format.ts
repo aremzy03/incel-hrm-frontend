@@ -1,3 +1,19 @@
+import type { LeaveBalance, LeaveStatus } from "@/lib/types/leave";
+
+/** Employee-facing next-step copy. Complete strings so translators can reorder. */
+const LEAVE_STATUS_HINT: Partial<Record<LeaveStatus, string>> = {
+  PENDING_TEAM_LEAD: "Waiting on Team Lead",
+  PENDING_SUPERVISOR: "Waiting on Unit Supervisor",
+  PENDING_MANAGER: "Waiting on Manager",
+  PENDING_HR: "Waiting on HR",
+  PENDING_ED: "Waiting on ED",
+  REJECTED: "Open to read the comment",
+};
+
+export function leaveStatusHint(status: LeaveStatus): string | undefined {
+  return LEAVE_STATUS_HINT[status];
+}
+
 export function formatLeaveDays(value: number | string | null | undefined): string {
   const n = Number(value ?? 0);
   if (Number.isNaN(n)) return "0";
@@ -51,4 +67,23 @@ export function formatLeaveDuration(start: string, end: string): string {
   });
 
   return `${startLabel} – ${endLabel}`;
+}
+
+export function formatLeaveShortDate(value: string): string {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export function sortLeaveBalances(balances: LeaveBalance[]): LeaveBalance[] {
+  return [...balances].sort((a, b) => {
+    const aAnnual = (a.leave_type.code ?? "").toUpperCase() === "ANNUAL" ? 0 : 1;
+    const bAnnual = (b.leave_type.code ?? "").toUpperCase() === "ANNUAL" ? 0 : 1;
+    if (aAnnual !== bAnnual) return aAnnual - bAnnual;
+    return (a.leave_type.display_order ?? 100) - (b.leave_type.display_order ?? 100);
+  });
 }
