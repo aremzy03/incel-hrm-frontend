@@ -11,14 +11,18 @@ import {
   Settings,
   Shield,
   UserMinus,
+  ClipboardList,
+  UserCheck,
+  Star,
+  RefreshCcw,
 } from "lucide-react";
 import type { RoleName } from "@/lib/types/auth";
 import { LOAN_APPROVAL_NAV_ROLES } from "@/lib/rbac";
 
-export type ModuleId = "leave" | "loans" | "users" | "profile";
+export type ModuleId = "leave" | "loans" | "users" | "profile" | "appraisals";
 
 export interface ModuleTab {
-  id: ModuleId | "dashboard" | "appraisals";
+  id: ModuleId | "dashboard";
   label: string;
   href: string;
   disabled?: boolean;
@@ -57,7 +61,7 @@ export const MODULE_TABS: ModuleTab[] = [
   { id: "leave", label: "Leave Management", href: "/leave" },
   { id: "loans", label: "Staff Loans", href: "/loans" },
   { id: "users", label: "Users", href: "/users" },
-  { id: "appraisals", label: "Appraisals", href: "/appraisals", comingSoon: true },
+  { id: "appraisals", label: "Appraisals", href: "/appraisals" },
 ];
 
 export const MODULE_CONFIGS: Record<ModuleId, ModuleConfig> = {
@@ -165,6 +169,42 @@ export const MODULE_CONFIGS: Record<ModuleId, ModuleConfig> = {
       { label: "My Profile", href: "/profile", icon: UserCircle },
     ],
   },
+  appraisals: {
+    id: "appraisals",
+    sectionLabel: "Staff Appraisals",
+    navItems: [
+      {
+        label: "My Appraisals",
+        href: "/appraisals/me",
+        icon: ClipboardList,
+        tourTarget: "appraisals-nav-me",
+      },
+      {
+        label: "Team Appraisals",
+        href: "/appraisals/team",
+        icon: UserCheck,
+        allowedRoles: ["LINE_MANAGER", "SUPERVISOR", "HR", "EXECUTIVE_DIRECTOR", "MANAGING_DIRECTOR"] as RoleName[],
+      },
+      {
+        label: "All Appraisals",
+        href: "/appraisals/all",
+        icon: Star,
+        allowedRoles: ["HR", "EXECUTIVE_DIRECTOR", "MANAGING_DIRECTOR"] as RoleName[],
+      },
+      {
+        label: "Cycle Manager",
+        href: "/appraisals/admin/cycles",
+        icon: RefreshCcw,
+        allowedRoles: ["HR"] as RoleName[],
+      },
+      {
+        label: "Template Builder",
+        href: "/appraisals/admin/templates",
+        icon: Settings,
+        allowedRoles: ["HR"] as RoleName[],
+      },
+    ],
+  },
 };
 
 export function detectModule(pathname: string): ModuleId {
@@ -172,6 +212,7 @@ export function detectModule(pathname: string): ModuleId {
   if (pathname.startsWith("/users") || pathname.startsWith("/departments") || pathname.startsWith("/units"))
     return "users";
   if (pathname.startsWith("/profile")) return "profile";
+  if (pathname.startsWith("/appraisals")) return "appraisals";
   return "leave";
 }
 

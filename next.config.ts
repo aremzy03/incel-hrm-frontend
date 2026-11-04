@@ -1,3 +1,4 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 // Dev-only allowance so impeccable live mode can load.
@@ -17,6 +18,9 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   output: "standalone",
   allowedDevOrigins: ["localhost", "127.0.0.1"],
   async redirects() {

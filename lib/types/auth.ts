@@ -240,6 +240,27 @@ export interface AuthResponse {
   user: User;
 }
 
+// ─── Magic link ─────────────────────────────────────────────────────────────
+
+export interface MagicLinkInspectResponse {
+  email: string;
+  destination_path: string;
+  is_valid: boolean;
+  is_expired: boolean;
+  is_consumed: boolean;
+}
+
+export interface MagicLinkExchangeRequest {
+  token: string;
+}
+
+export interface MagicLinkExchangeResponse {
+  access: string;
+  refresh: string;
+  destination_path: string;
+  user: User;
+}
+
 // ─── Password management ─────────────────────────────────────────────────────
 
 export interface PasswordChangePayload {

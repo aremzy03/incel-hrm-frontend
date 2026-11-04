@@ -4,7 +4,7 @@ import { Suspense, useState, useId } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSafeReturnPath } from "@/lib/safeReturnPath";
@@ -102,17 +102,51 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => searchParams.get("email") || "");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const nextParam = searchParams.get("next");
+  const reasonParam = searchParams.get("reason");
   const afterLoginPath = getSafeReturnPath(nextParam);
   const registerHref =
     nextParam && nextParam.length <= 1500
       ? `/register?next=${encodeURIComponent(nextParam)}`
       : "/register";
+
+  const reasonAlert = (() => {
+    if (!reasonParam) return null;
+    if (reasonParam === "expired") {
+      return {
+        variant: "warning",
+        title: "Link expired or already used",
+        description:
+          "This sign-in link is no longer valid or has already been used. Please sign in with your password to continue.",
+      };
+    }
+    if (reasonParam === "invalid") {
+      return {
+        variant: "destructive",
+        title: "Invalid link",
+        description:
+          "The sign-in link is invalid or incomplete. Please sign in with your email and password.",
+      };
+    }
+    if (reasonParam === "inactive") {
+      return {
+        variant: "destructive",
+        title: "Account inactive",
+        description:
+          "Your account is currently inactive. Please contact HR or your system administrator.",
+      };
+    }
+    return {
+      variant: "warning",
+      title: "Authentication notice",
+      description: "Please sign in with your credentials to continue.",
+    };
+  })();
 
   const mutation = useMutation({
     mutationFn: loginFn,
@@ -153,6 +187,34 @@ function LoginForm() {
           <p className="mt-1 text-sm text-muted-foreground">
             Sign in to your HR Portal account.
           </p>
+
+          {reasonAlert && !error && (
+            <div
+              className={cn(
+                "mt-4 rounded-xl border p-4 text-sm",
+                reasonAlert.variant === "warning"
+                  ? "border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200"
+                  : "border-destructive/30 bg-destructive/10 text-destructive"
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <AlertCircle
+                  className={cn(
+                    "h-5 w-5 shrink-0 mt-0.5",
+                    reasonAlert.variant === "warning"
+                      ? "text-amber-600 dark:text-amber-400"
+                      : "text-destructive"
+                  )}
+                />
+                <div>
+                  <p className="font-semibold text-foreground">{reasonAlert.title}</p>
+                  <p className="mt-1 text-xs leading-relaxed opacity-90">
+                    {reasonAlert.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
