@@ -24,6 +24,7 @@ import {
   type ApprovalStep,
 } from "@/components/hrm/leave/ApprovalChain";
 import { EmployeeLeaveContext } from "@/components/hrm/leave/EmployeeLeaveContext";
+import { CalculationSnapshotCard } from "@/components/hrm/leave/CalculationSnapshotCard";
 import {
   stitchCardClass,
   stitchFieldClass,
@@ -1037,16 +1038,14 @@ export default function LeaveRequestDetailPage({
                 </p>
               </div>
             )}
-            {(request.policy || request.policy_version != null) && (
-              <p className="mt-4 text-xs text-muted-foreground">
-                Calculated with policy {request.policy ? `${request.policy.slice(0, 8)}…` : ""} v{request.policy_version ?? "—"}
-              </p>
-            )}
-            {request.calculation_snapshot && (
-              <pre className="mt-3 max-h-40 overflow-auto rounded-lg bg-muted/50 p-3 text-[11px]">
-                {JSON.stringify(request.calculation_snapshot, null, 2)}
-              </pre>
-            )}
+            <CalculationSnapshotCard
+              policyId={request.policy}
+              policyVersion={request.policy_version}
+              snapshot={request.calculation_snapshot}
+              totalWorkingDays={request.total_working_days}
+              isHalfDay={request.is_half_day}
+              halfDayPeriod={request.half_day_period}
+            />
             </>
             )}
           </div>

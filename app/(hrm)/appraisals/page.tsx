@@ -1,10 +1,6 @@
-import { ComingSoon } from "@/components/hrm/ComingSoon";
+import { redirect } from "next/navigation";
 
-export default function StaffAppraisalsPage() {
-  return (
-    <ComingSoon
-      title="Staff Appraisal Management"
-      description="90-day checks, bi-annual reviews, KPI scoring, and performance calibration — coming soon."
-    />
-  );
+/** Root /appraisals → redirect to /appraisals/me */
+export default function AppraisalsRootPage() {
+  redirect("/appraisals/me");
 }

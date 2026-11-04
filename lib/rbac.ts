@@ -1,5 +1,6 @@
 import type { User, RoleName } from "@/lib/types/auth";
 import type { LoanApplication } from "@/lib/types/loan";
+import type { AppraisalStatusCode } from "@/lib/types/appraisal";
 
 /** Roles that can access the Users management section */
 export const USERS_SECTION_ROLES: RoleName[] = [
@@ -86,4 +87,87 @@ export function isLoanPrivilegedList(
   if (!user) return false;
   if (hasRole(user, ...LOAN_APPROVER_ROLES)) return true;
   return hasObserverAccess === true;
+}
+
+// ─── Appraisal RBAC ───────────────────────────────────────────────────────────
+
+/** Roles that can view the team appraisals page (manager's direct reports). */
+export const APPRAISAL_SUPERVISOR_ROLES: RoleName[] = [
+  "LINE_MANAGER",
+  "SUPERVISOR",
+];
+
+/** Roles that can view all appraisals, run HR calibration, manage cycles. */
+export const APPRAISAL_HR_ROLES: RoleName[] = [
+  "HR",
+  "EXECUTIVE_DIRECTOR",
+  "MANAGING_DIRECTOR",
+];
+
+/** Roles that can finalize (Committee / Management decision). */
+export const APPRAISAL_FINALIZE_ROLES: RoleName[] = [
+  "EXECUTIVE_DIRECTOR",
+  "MANAGING_DIRECTOR",
+];
+
+/** Can the user view the team appraisals tab? */
+export function canViewTeamAppraisals(user: User | null): boolean {
+  return hasRole(user, ...APPRAISAL_SUPERVISOR_ROLES, ...APPRAISAL_HR_ROLES);
+}
+
+/** Can the user view all appraisals (org-wide)? */
+export function canViewAllAppraisals(user: User | null): boolean {
+  return hasRole(user, ...APPRAISAL_HR_ROLES);
+}
+
+/** Can the user perform HR calibration? */
+export function canHrCalibrate(user: User | null): boolean {
+  return hasRole(user, "HR");
+}
+
+/** Can the user finalize an appraisal (committee decision)? */
+export function canFinalizeAppraisal(user: User | null): boolean {
+  return hasRole(user, ...APPRAISAL_FINALIZE_ROLES);
+}
+
+/** Can the user reopen an appraisal at any stage? */
+export function canReopenAppraisal(user: User | null): boolean {
+  return hasRole(user, "HR");
+}
+
+/** Can the user manage cycles and templates? */
+export function canManageAppraisalAdmin(user: User | null): boolean {
+  return hasRole(user, "HR");
+}
+
+/**
+ * Determine whether the current user can take the primary action on an appraisal
+ * given its current status.
+ */
+export function canActOnAppraisal(
+  user: User | null,
+  status: AppraisalStatusCode,
+  appraisalEmployeeId: string
+): boolean {
+  if (!user) return false;
+  const isOwner = user.id === appraisalEmployeeId;
+  switch (status) {
+    case "NOT_STARTED":
+    case "DRAFT":
+    case "REOPENED_FOR_EMPLOYEE":
+      return isOwner;
+    case "SELF_SUBMITTED":
+    case "REOPENED_FOR_SUPERVISOR":
+      return hasRole(user, ...APPRAISAL_SUPERVISOR_ROLES);
+    case "PENDING_APPRAISEE_ACCEPTANCE":
+      return isOwner;
+    case "PENDING_HR_CALIBRATION":
+      return canHrCalibrate(user);
+    case "PENDING_MANAGEMENT_DECISION":
+      return canFinalizeAppraisal(user);
+    case "FINALIZED":
+      return false;
+    default:
+      return false;
+  }
 }
