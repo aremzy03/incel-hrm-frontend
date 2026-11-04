@@ -14,7 +14,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (user: User) => void;
-  logout: () => Promise<void>;
+  logout: (redirect?: boolean | string) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -40,13 +40,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(u);
   }, []);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (redirect: boolean | string = true) => {
     await fetch("/api/auth/logout", {
       method: "POST",
       credentials: "include",
     });
     setUser(null);
-    window.location.href = "/";
+    if (redirect === true) {
+      window.location.href = "/";
+    } else if (typeof redirect === "string") {
+      window.location.href = redirect;
+    }
   }, []);
 
   const refreshUser = useCallback(async () => {

@@ -239,9 +239,22 @@ export interface LeaveRequest {
   half_day_period?: HalfDayPeriod;
   policy?: string | null;
   policy_version?: number | null;
-  calculation_snapshot?: Record<string, unknown> | null;
+  calculation_snapshot?: LeaveCalculationSnapshot | null;
   workflow_snapshot?: WorkflowSnapshot | null;
   stage_entered_at?: string | null;
+}
+
+export interface LeaveCalculationSnapshot {
+  weekend_excluded?: boolean;
+  public_holiday_excluded?: boolean;
+  working_weekdays?: number[];
+  working_calendar_id?: string | null;
+  holiday_calendar_id?: string | null;
+  is_half_day?: boolean;
+  total_working_days?: string | number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  [key: string]: unknown;
 }
 
 export interface WorkflowSnapshotStage {

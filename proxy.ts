@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getSafeReturnPath } from "./lib/safeReturnPath";
 
-const PUBLIC_ROUTES = ["/", "/register"];
+const PUBLIC_ROUTES = ["/", "/login", "/register"];
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // Magic link route handles its own session checking, account switching, and token exchange
+  if (pathname.startsWith("/auth/magic-link")) {
+    return NextResponse.next();
+  }
+
   const hasAccess = req.cookies.has("hrm_access");
 
   const isPublic = PUBLIC_ROUTES.includes(pathname);
