@@ -63,8 +63,14 @@ async function proxyRequest(
   }
   if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
 
-  const body =
-    method !== "GET" && method !== "HEAD" ? await req.text() : undefined;
+  // Multipart bodies are binary. Reading them as text corrupts PDF and image uploads.
+  let body: BodyInit | undefined;
+  if (method !== "GET" && method !== "HEAD") {
+    body =
+      contentType && contentType.includes("multipart/form-data")
+        ? await req.arrayBuffer()
+        : await req.text();
+  }
 
   let res = await fetch(targetUrl, {
     method,
@@ -113,6 +119,20 @@ async function proxyRequest(
   if (ct.includes("application/json")) {
     const data = await res.json().catch(() => ({}));
     return NextResponse.json(data, { status: res.status });
+  }
+
+  // Local leave attachments are streamed (PDF / images). Do not decode them as text.
+  const isBinary =
+    ct.startsWith("application/pdf") ||
+    ct.startsWith("image/") ||
+    ct.startsWith("application/octet-stream");
+  if (isBinary) {
+    const buf = await res.arrayBuffer();
+    const outHeaders = new Headers();
+    outHeaders.set("Content-Type", ct);
+    const disposition = res.headers.get("content-disposition");
+    if (disposition) outHeaders.set("Content-Disposition", disposition);
+    return new NextResponse(buf, { status: res.status, headers: outHeaders });
   }
 
   const text = await res.text();

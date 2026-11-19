@@ -79,6 +79,7 @@ export default function LeavePolicyDetailPage() {
       "public_holiday_excluded",
       "half_day_allowed",
       "reliever_required",
+      "requires_attachment",
       "carry_forward",
     ];
     return keys

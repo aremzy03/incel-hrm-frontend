@@ -24,6 +24,7 @@ import { canActOnAppraisal, canHrCalibrate, canFinalizeAppraisal, canReopenAppra
 import { hasRole } from "@/lib/rbac";
 import type { AppraisalStatusCode, SelfRatingPayload, SupervisorRatingPayload, RecommendationCode } from "@/lib/types/appraisal";
 import { toast } from "@/lib/toast";
+import { VersionedAppraisalDetail } from "@/components/hrm/appraisals/VersionedAppraisalForm";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -389,6 +390,10 @@ export default function AppraisalDetailPage() {
   }
 
   const sections = appraisal.template.sections;
+
+  if (appraisal.form) {
+    return <VersionedAppraisalDetail appraisal={appraisal} />;
+  }
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">

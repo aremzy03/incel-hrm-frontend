@@ -27,6 +27,7 @@ export const emptyPolicyForm = (leaveTypeId = ""): LeavePolicyWritePayload => ({
   effective_from: null,
   effective_to: null,
   reliever_required: true,
+  requires_attachment: false,
   reliever_scope: "AUTO",
   overlap_control_enabled: false,
   overlap_scope: "AUTO",
@@ -55,6 +56,7 @@ export function policyToForm(p: {
   effective_from: string | null;
   effective_to: string | null;
   reliever_required?: boolean;
+  requires_attachment?: boolean;
   reliever_scope?: RelieverScope;
   overlap_control_enabled?: boolean;
   overlap_scope?: RelieverScope;
@@ -81,6 +83,7 @@ export function policyToForm(p: {
     effective_from: p.effective_from,
     effective_to: p.effective_to,
     reliever_required: p.reliever_required ?? true,
+    requires_attachment: p.requires_attachment ?? false,
     reliever_scope: p.reliever_scope ?? "AUTO",
     overlap_control_enabled: p.overlap_control_enabled ?? false,
     overlap_scope: p.overlap_scope ?? "AUTO",
@@ -276,6 +279,14 @@ export function PolicyForm({
           checked={!!form.reliever_required}
           disabled={readOnly}
           onChange={(v) => patch({ reliever_required: v })}
+        />
+        <Check
+          id={`${formId}-attachment`}
+          label="Attachment required"
+          checked={!!form.requires_attachment}
+          disabled={readOnly}
+          onChange={(v) => patch({ requires_attachment: v })}
+          hint="Staff must attach a file before submitting. Emergency sick leave can be submitted without one."
         />
         <div>
           <FieldLabel htmlFor={`${formId}-reliever-scope`}>Reliever scope</FieldLabel>

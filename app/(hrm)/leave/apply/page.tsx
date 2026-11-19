@@ -19,7 +19,13 @@ import {
   stitchTextareaClass,
 } from "@/lib/design/field-styles";
 import { apiGet, apiPost, ApiError } from "@/lib/api-client";
-import { useEligibleRelievers } from "@/lib/api/leave";
+import {
+  LEAVE_ATTACHMENT_ACCEPT,
+  LEAVE_ATTACHMENT_MAX_FILES,
+  filterLeaveAttachmentFiles,
+  uploadLeaveAttachment,
+  useEligibleRelievers,
+} from "@/lib/api/leave";
 import { useLeaveTypes } from "@/lib/api/leave-types";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -60,6 +66,8 @@ const VALIDATION_FIELDS = [
   "leave_type",
   "cover_person",
   "end_date",
+  "attachments",
+  "file",
 ] as const;
 
 function getValidationMessage(data: Record<string, unknown> | undefined): string {
@@ -156,6 +164,9 @@ export default function ApplyLeavePage() {
   const [isHalfDay, setIsHalfDay] = useState(false);
   const [halfDayPeriod, setHalfDayPeriod] = useState<"AM" | "PM">("AM");
   const [blackoutOverride, setBlackoutOverride] = useState("");
+  const [isEmergency, setIsEmergency] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
 
   const deptId =
     typeof user?.department === "string"
@@ -202,6 +213,10 @@ export default function ApplyLeavePage() {
   const minStartDate = allowsSameDayLeave ? todayYmd() : tomorrowYmd();
   const minEndDate = startDate || minStartDate;
   const halfDayAllowed = !!resolvedPolicy?.half_day_allowed;
+  const emergencySick = allowsSameDayLeave && isEmergency;
+  const requiresAttachment = !!resolvedPolicy?.requires_attachment;
+  // Emergency sick still needs a reliever when the policy says so. The
+  // checkbox only exempts the supporting document.
   const relieverRequired = isRelieverRequired({
     relieverRequired: resolvedPolicy?.reliever_required,
     isEmergency: false,
@@ -270,13 +285,26 @@ export default function ApplyLeavePage() {
     leaveTypeId !== "" &&
     startDate !== "" &&
     endDate !== "";
+  const attachmentSatisfied =
+    !requiresAttachment || emergencySick || files.length > 0;
   const canSubmit =
-    baseFieldsValid && (!relieverRequired || !!coverPersonId);
+    baseFieldsValid && (!relieverRequired || !!coverPersonId) && attachmentSatisfied;
   const canSaveDraft = baseFieldsValid;
 
   const createDraftMutation = useMutation({
-    mutationFn: async (payload: LeaveRequestCreatePayload) => {
+    mutationFn: async ({
+      payload,
+      files: chosen,
+    }: {
+      payload: LeaveRequestCreatePayload;
+      files: File[];
+    }) => {
       const created = await apiPost<LeaveRequest>("leave-requests", payload);
+      if (created.id && chosen.length) {
+        for (const file of chosen) {
+          await uploadLeaveAttachment(created.id, file);
+        }
+      }
       return created;
     },
     onSuccess: (created) => {
@@ -302,11 +330,28 @@ export default function ApplyLeavePage() {
   });
 
   const createAndSubmitMutation = useMutation({
-    mutationFn: async (payload: LeaveRequestCreatePayload) => {
-      return apiPost<LeaveRequest>(
-        "leave-requests/create-and-submit/",
-        payload
-      );
+    mutationFn: async ({
+      payload,
+      files: chosen,
+      uploadFirst,
+    }: {
+      payload: LeaveRequestCreatePayload;
+      files: File[];
+      uploadFirst: boolean;
+    }) => {
+      if (!uploadFirst) {
+        return apiPost<LeaveRequest>("leave-requests/create-and-submit/", payload);
+      }
+      const draft = await apiPost<LeaveRequest>("leave-requests", payload);
+      if (!draft.id) {
+        throw new ApiError(500, {
+          detail: "The draft was saved but its id was missing, so the documents could not be attached.",
+        });
+      }
+      for (const file of chosen) {
+        await uploadLeaveAttachment(draft.id, file);
+      }
+      return apiPost<LeaveRequest>(`leave-requests/${draft.id}/submit/`);
     },
     onSuccess: () => {
       setSubmitted(true);
@@ -332,7 +377,7 @@ export default function ApplyLeavePage() {
     start_date: startDate,
     end_date: isHalfDay && halfDayAllowed ? startDate : endDate,
     reason,
-    is_emergency: false,
+    is_emergency: emergencySick,
     ...(coverPersonId ? { cover_person: coverPersonId } : {}),
     ...(isHalfDay && halfDayAllowed
       ? { is_half_day: true, half_day_period: halfDayPeriod }
@@ -342,16 +387,27 @@ export default function ApplyLeavePage() {
       : {}),
   };
 
+  function onFilesChosen(list: FileList | null) {
+    const next = filterLeaveAttachmentFiles(list ?? []);
+    setFiles(next.files);
+    setFileNotice(next.error);
+  }
+
   function doSaveDraft() {
     setApiError(null);
     setCoverPersonError(null);
-    createDraftMutation.mutate(payload);
+    createDraftMutation.mutate({ payload, files });
   }
 
   function doSubmit() {
     setApiError(null);
     setCoverPersonError(null);
-    createAndSubmitMutation.mutate(payload);
+    if (requiresAttachment && !emergencySick && files.length === 0) {
+      setFileNotice("Add a supporting document before submitting.");
+      return;
+    }
+    const uploadFirst = files.length > 0 || (requiresAttachment && !emergencySick);
+    createAndSubmitMutation.mutate({ payload, files, uploadFirst });
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -438,6 +494,9 @@ export default function ApplyLeavePage() {
                       const nextId = e.target.value;
                       setLeaveTypeId(nextId);
                       const nextType = leaveTypes.find((t) => t.id === nextId);
+                      if (!nextType || !isSickLeaveType(nextType)) {
+                        setIsEmergency(false);
+                      }
                       if (
                         !isRelieverRequired({
                           relieverRequired: resolvedPolicy?.reliever_required,
@@ -591,6 +650,68 @@ export default function ApplyLeavePage() {
                   Weekends and public holidays are excluded from the
                   calculation.
                 </p>
+              </div>
+
+              {allowsSameDayLeave && (
+                <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-4">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={isEmergency}
+                    onChange={(e) => setIsEmergency(e.target.checked)}
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium text-foreground">This is an emergency</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Emergency sick leave can be submitted without a document.
+                      You can add the document while the request is still pending.
+                    </span>
+                  </span>
+                </label>
+              )}
+
+              <div>
+                <FieldLabel htmlFor={`${formId}-files`} optional={!requiresAttachment || emergencySick}>
+                  Supporting documents
+                </FieldLabel>
+                <input
+                  id={`${formId}-files`}
+                  type="file"
+                  accept={LEAVE_ATTACHMENT_ACCEPT}
+                  multiple
+                  onChange={(e) => {
+                    onFilesChosen(e.target.files);
+                    e.target.value = "";
+                  }}
+                  className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border file:border-border file:bg-background file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground"
+                />
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  PDF, JPG, PNG, or WEBP. Up to {LEAVE_ATTACHMENT_MAX_FILES} files, 5 MB each.
+                  {requiresAttachment && !emergencySick
+                    ? " This leave type requires at least one document."
+                    : ""}
+                </p>
+                {fileNotice && (
+                  <p className="mt-1.5 text-xs text-destructive">{fileNotice}</p>
+                )}
+                {files.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-sm text-foreground">
+                    {files.map((file) => (
+                      <li key={`${file.name}-${file.size}`} className="flex items-center justify-between gap-3">
+                        <span className="truncate">{file.name}</span>
+                        <button
+                          type="button"
+                          className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
+                          onClick={() =>
+                            setFiles((current) => current.filter((item) => item !== file))
+                          }
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               <div>

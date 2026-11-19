@@ -61,7 +61,7 @@ export const MODULE_TABS: ModuleTab[] = [
   { id: "leave", label: "Leave Management", href: "/leave" },
   { id: "loans", label: "Staff Loans", href: "/loans" },
   { id: "users", label: "Users", href: "/users" },
-  { id: "appraisals", label: "Appraisals", href: "/appraisals" },
+  { id: "appraisals", label: "Appraisals", href: "/appraisals", disabled: true },
 ];
 
 export const MODULE_CONFIGS: Record<ModuleId, ModuleConfig> = {

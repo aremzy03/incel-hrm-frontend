@@ -31,6 +31,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { hasRole } from "@/lib/rbac";
 import { ApiError } from "@/lib/api-client";
 import {
+  LEAVE_ATTACHMENT_ACCEPT,
+  LEAVE_ATTACHMENT_MAX_FILES,
+  RECONCILE_ATTACHMENT_OVERRIDE,
+  filterLeaveAttachmentFiles,
+  uploadLeaveAttachment,
   useBulkReconcileLeave,
   useBulkReconcileLeaveCsv,
   useLeaveBalances,
@@ -38,6 +43,7 @@ import {
   useReconciledLeaveRequestsPage,
 } from "@/lib/api/leave";
 import { useLeaveTypes } from "@/lib/api/leave-types";
+import { useLeavePolicyResolution } from "@/lib/api/leave-assignments";
 import { extractFieldError } from "@/lib/leave/reliever";
 import {
   downloadCsvTemplate,
@@ -95,6 +101,10 @@ export default function LeaveReconciliationPage() {
   const [coverPersonId, setCoverPersonId] = useState<string | null>(null);
   const [allowInsufficient, setAllowInsufficient] = useState(false);
   const [notifyDept, setNotifyDept] = useState(false);
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [attachmentOverride, setAttachmentOverride] = useState("");
+  const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -108,6 +118,19 @@ export default function LeaveReconciliationPage() {
   const [bulkMode, setBulkMode] = useState<"rows" | "csv">("rows");
 
   const { data: leaveTypes = [] } = useLeaveTypes();
+  const { data: resolution } = useLeavePolicyResolution(
+    {
+      employee: employeeId ?? undefined,
+      leave_type: leaveTypeId,
+      date: startDate || undefined,
+    },
+    { enabled: !!leaveTypeId }
+  );
+  const requiresAttachment = !!resolution?.resolved_policy?.requires_attachment;
+  const attachmentReady =
+    !requiresAttachment ||
+    attachmentFiles.length > 0 ||
+    attachmentOverride.trim().length > 0;
   const reconcileMutation = useReconcileLeaveRequest();
   const bulkMutation = useBulkReconcileLeave();
   const csvMutation = useBulkReconcileLeaveCsv();
@@ -131,7 +154,8 @@ export default function LeaveReconciliationPage() {
     leaveTypeId &&
     startDate &&
     endDate &&
-    reconciliationNote.trim().length > 0;
+    reconciliationNote.trim().length > 0 &&
+    attachmentReady;
 
   async function handleSingleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -139,7 +163,15 @@ export default function LeaveReconciliationPage() {
     setFormError(null);
     setFieldErrors({});
 
+    if (requiresAttachment && !attachmentReady) {
+      setAttachmentNotice("Choose a supporting document or enter an override reason.");
+      return;
+    }
+
     try {
+      const overrideReason = attachmentFiles.length
+        ? RECONCILE_ATTACHMENT_OVERRIDE
+        : attachmentOverride.trim();
       const created = await reconcileMutation.mutateAsync({
         employee: employeeId,
         leave_type: leaveTypeId,
@@ -150,7 +182,28 @@ export default function LeaveReconciliationPage() {
         cover_person: coverPersonId || undefined,
         allow_insufficient_balance: allowInsufficient,
         notify_department_colleagues: notifyDept,
+        ...(requiresAttachment
+          ? { attachment_override_reason: overrideReason }
+          : {}),
       });
+      if (attachmentFiles.length && created.id) {
+        setUploadingAttachment(true);
+        try {
+          for (const file of attachmentFiles) {
+            await uploadLeaveAttachment(created.id, file);
+          }
+        } catch (uploadErr) {
+          const message =
+            uploadErr instanceof ApiError ? uploadErr.message : "Upload failed.";
+          setFormError(
+            `Leave was recorded, but the document did not upload (${message}). Open the request and add the file there.`
+          );
+          router.push(`/leave/requests/${created.id}`);
+          return;
+        } finally {
+          setUploadingAttachment(false);
+        }
+      }
       router.push(`/leave/requests/${created.id}`);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -162,6 +215,7 @@ export default function LeaveReconciliationPage() {
           "start_date",
           "end_date",
           "reconciliation_note",
+          "attachment_override_reason",
           "reason",
           "cover_person",
           "leave_balance",
@@ -171,7 +225,9 @@ export default function LeaveReconciliationPage() {
           if (msg) fields[key] = msg;
         }
         setFieldErrors(fields);
-        if (!Object.keys(fields).length) {
+        if (fields.attachment_override_reason) {
+          setFormError(fields.attachment_override_reason);
+        } else if (!Object.keys(fields).length) {
           setFormError(err.message);
         }
       } else {
@@ -432,6 +488,67 @@ export default function LeaveReconciliationPage() {
                 )}
               </div>
 
+              {requiresAttachment && (
+                <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                  <div>
+                    <FieldLabel htmlFor="reconcile-files" optional={attachmentOverride.trim().length > 0}>
+                      Supporting document
+                    </FieldLabel>
+                    <input
+                      id="reconcile-files"
+                      type="file"
+                      accept={LEAVE_ATTACHMENT_ACCEPT}
+                      multiple
+                      onChange={(e) => {
+                        const next = filterLeaveAttachmentFiles(e.target.files ?? []);
+                        setAttachmentFiles(next.files);
+                        setAttachmentNotice(next.error);
+                        e.target.value = "";
+                      }}
+                      className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border file:border-border file:bg-background file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground"
+                    />
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      This leave type requires a document, or an override reason if you do not have one.
+                      PDF, JPG, PNG, or WEBP. Up to {LEAVE_ATTACHMENT_MAX_FILES} files, 5 MB each.
+                    </p>
+                    {attachmentFiles.length > 0 && (
+                      <ul className="mt-2 space-y-1 text-sm">
+                        {attachmentFiles.map((file) => (
+                          <li key={`${file.name}-${file.size}`} className="truncate">
+                            {file.name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div>
+                    <FieldLabel htmlFor="reconcile-override" optional={attachmentFiles.length > 0}>
+                      Override reason
+                    </FieldLabel>
+                    <textarea
+                      id="reconcile-override"
+                      rows={2}
+                      value={attachmentOverride}
+                      onChange={(e) => {
+                        setAttachmentOverride(e.target.value);
+                        setFieldErrors((f) => ({ ...f, attachment_override_reason: "" }));
+                        setAttachmentNotice(null);
+                      }}
+                      placeholder="Required only when you are not attaching a file"
+                      className={stitchTextareaClass}
+                    />
+                    {fieldErrors.attachment_override_reason && (
+                      <p className="mt-1.5 text-xs text-destructive">
+                        {fieldErrors.attachment_override_reason}
+                      </p>
+                    )}
+                  </div>
+                  {attachmentNotice && (
+                    <p className="text-xs text-destructive">{attachmentNotice}</p>
+                  )}
+                </div>
+              )}
+
               <UserSearchField
                 label="Cover person (reliever)"
                 value={coverPersonId}
@@ -487,10 +604,10 @@ export default function LeaveReconciliationPage() {
 
               <button
                 type="submit"
-                disabled={!canSubmitSingle || reconcileMutation.isPending}
+                disabled={!canSubmitSingle || reconcileMutation.isPending || uploadingAttachment}
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
-                {reconcileMutation.isPending && (
+                {(reconcileMutation.isPending || uploadingAttachment) && (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 )}
                 Record leave retroactively

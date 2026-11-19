@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useMemo, useEffect } from "react";
+import { Suspense, useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, X, Loader2, Eye, Search } from "lucide-react";
@@ -15,6 +15,7 @@ import type { LeaveStatus } from "@/lib/types/leave";
 
 /** Matches backend DRF PageNumberPagination PAGE_SIZE default. */
 const PAGE_SIZE = 20;
+const MIN_SEARCH_CHARS = 2;
 
 const ALL_STATUSES: LeaveStatus[] = [
   "DRAFT",
@@ -48,14 +49,29 @@ function LeaveRequestsDirectoryContent() {
   const employeeParam = searchParams.get("employee");
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearchRef = useRef("");
   const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | string>("all");
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      const trimmed = search.trim();
+      const next = trimmed.length >= MIN_SEARCH_CHARS ? trimmed : "";
+      if (debouncedSearchRef.current === next) return;
+      debouncedSearchRef.current = next;
+      setDebouncedSearch(next);
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(handle);
+  }, [search]);
 
   const { data: requestsPage, isLoading, isFetching } = useLeaveRequestsPage({
     employee: employeeParam ?? undefined,
     status: statusFilter === "all" ? undefined : statusFilter,
     leave_type: typeFilter === "all" ? undefined : typeFilter,
+    search: debouncedSearch || undefined,
     page,
   });
 
@@ -83,18 +99,6 @@ function LeaveRequestsDirectoryContent() {
     const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
     if (page > maxPage) setPage(maxPage);
   }, [total, page]);
-
-  // Search is not supported by the list API; filter the current page only.
-  const pageRecords = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return records;
-    return records.filter((r) => {
-      const fullName =
-        `${r.employee.first_name} ${r.employee.last_name}`.toLowerCase();
-      const email = (r.employee.email ?? "").toLowerCase();
-      return fullName.includes(q) || email.includes(q);
-    });
-  }, [records, search]);
 
   const rangeStart =
     total === 0 ? 0 : Math.min((page - 1) * PAGE_SIZE + 1, total);
@@ -135,12 +139,7 @@ function LeaveRequestsDirectoryContent() {
         </div>
       )}
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
-        <div className={cn(isFetching && "opacity-70 transition-opacity")}>
+      <div>
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -148,10 +147,16 @@ function LeaveRequestsDirectoryContent() {
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search this page by name or email…"
-                className={cn(selectClass, "w-full pl-9")}
-                aria-label="Search employees on this page"
+                placeholder="Search by name or email"
+                className={cn(selectClass, "w-full pl-9", isFetching && "pr-9")}
+                aria-label="Search by name or email"
               />
+              {isFetching ? (
+                <Loader2
+                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground"
+                  aria-hidden
+                />
+              ) : null}
             </div>
 
             <select
@@ -208,10 +213,22 @@ function LeaveRequestsDirectoryContent() {
             )}
           </div>
 
+          {search.trim().length > 0 && search.trim().length < MIN_SEARCH_CHARS ? (
+            <p className="mb-3 text-xs text-muted-foreground">
+              Type at least 2 characters to search.
+            </p>
+          ) : null}
+
+          {isLoading && !requestsPage ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+          <div className={cn(isFetching && "opacity-70 transition-opacity")}>
           <DataTable
             columns={TABLE_COLUMNS}
             emptyMessage="No leave requests match the selected filters."
-            rows={pageRecords.map((row) => ({
+            rows={records.map((row) => ({
               employee: (
                 <div>
                   <span className="font-medium text-foreground">
@@ -317,8 +334,9 @@ function LeaveRequestsDirectoryContent() {
               </nav>
             </div>
           )}
+          </div>
+          )}
         </div>
-      )}
     </div>
   );
 }

@@ -73,6 +73,7 @@ export interface LeavePolicy {
   allow_backdated: boolean;
   maximum_backdate_days: number | null;
   reliever_required?: boolean;
+  requires_attachment?: boolean;
   reliever_scope?: RelieverScope;
   overlap_control_enabled?: boolean;
   overlap_scope?: RelieverScope;
@@ -102,6 +103,7 @@ export interface LeavePolicyWritePayload {
   effective_from?: string | null;
   effective_to?: string | null;
   reliever_required?: boolean;
+  requires_attachment?: boolean;
   reliever_scope?: RelieverScope;
   overlap_control_enabled?: boolean;
   overlap_scope?: RelieverScope;
@@ -244,6 +246,15 @@ export interface LeaveRequest {
   stage_entered_at?: string | null;
 }
 
+export interface LeaveAttachment {
+  id: string;
+  original_filename: string;
+  content_type: string;
+  size: number;
+  uploaded_by: EmployeeMinimal;
+  created_at: string;
+}
+
 export interface LeaveCalculationSnapshot {
   weekend_excluded?: boolean;
   public_holiday_excluded?: boolean;
@@ -359,6 +370,7 @@ export interface LeaveReconcilePayload {
   cover_person?: string | null;
   allow_insufficient_balance?: boolean;
   notify_department_colleagues?: boolean;
+  attachment_override_reason?: string;
 }
 
 export interface LeaveReconcileRowPayload {

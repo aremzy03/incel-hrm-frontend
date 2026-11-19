@@ -176,6 +176,7 @@ export function policyFieldLabel(key: string): string {
     public_holiday_excluded: "Public holidays excluded",
     half_day_allowed: "Half-day allowed",
     reliever_required: "Reliever required",
+    requires_attachment: "Attachment required",
     carry_forward: "Carry forward",
   };
   return map[key] ?? key;
