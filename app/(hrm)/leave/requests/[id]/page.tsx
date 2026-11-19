@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useMemo } from "react";
+import { use, useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -33,7 +33,18 @@ import {
 } from "@/lib/design/field-styles";
 import { apiGet, apiPost, apiPatch, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEligibleRelievers, cancelLeaveRequest, useEditReconciledLeave } from "@/lib/api/leave";
+import {
+  LEAVE_ATTACHMENT_ACCEPT,
+  LEAVE_ATTACHMENT_MAX_FILES,
+  cancelLeaveRequest,
+  deleteLeaveAttachment,
+  filterLeaveAttachmentFiles,
+  openLeaveAttachment,
+  uploadLeaveAttachment,
+  useEditReconciledLeave,
+  useEligibleRelievers,
+  useLeaveAttachments,
+} from "@/lib/api/leave";
 import { useLeaveTypes } from "@/lib/api/leave-types";
 import { canUserActOnLeaveRequest } from "@/lib/leave/approval";
 import { isReconciledRequest } from "@/lib/leave/reconciliation";
@@ -46,6 +57,7 @@ import {
   formatRelieverName,
   isRelieverRequired,
   isRelieverRequiredByPolicy,
+  isSickLeaveType,
   shouldShowRelieverField,
 } from "@/lib/leave/reliever";
 import { FieldLabel } from "@/components/hrm/forms/FieldLabel";
@@ -59,6 +71,20 @@ import type {
   LeaveStatus,
   LeaveReconcileEditPayload,
 } from "@/lib/types/leave";
+
+const PENDING_STATUSES: LeaveStatus[] = [
+  "PENDING_TEAM_LEAD",
+  "PENDING_SUPERVISOR",
+  "PENDING_MANAGER",
+  "PENDING_HR",
+  "PENDING_ED",
+];
+
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 const APPROVAL_STEP_LABELS = [
   "Team Lead (if applicable)",
@@ -329,6 +355,15 @@ export default function LeaveRequestDetailPage({
   } | null>(null);
   const [hrEditError, setHrEditError] = useState<string | null>(null);
   const [hrCancelComment, setHrCancelComment] = useState("");
+  const [emergencyOverride, setEmergencyOverride] = useState<boolean | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const { data: attachments = [] } = useLeaveAttachments(id);
+
+  useEffect(() => {
+    setEmergencyOverride(null);
+    setAttachmentError(null);
+  }, [id]);
 
   const {
     data: request,
@@ -554,9 +589,13 @@ export default function LeaveRequestDetailPage({
 
   const selectedLeaveType =
     leaveTypes.find((t) => t.id === formValues.leave_type) ?? request.leave_type;
+  const sickSelected = isSickLeaveType(selectedLeaveType);
+  const emergencyChecked = sickSelected && (emergencyOverride ?? request.is_emergency);
+  const draftRequiresFile =
+    !!draftResolution?.resolved_policy?.requires_attachment && !emergencyChecked;
   const relieverRequired = isRelieverRequired({
     relieverRequired: draftResolution?.resolved_policy?.reliever_required,
-    isEmergency: request.is_emergency,
+    isEmergency: (emergencyOverride ?? request.is_emergency) && !sickSelected,
     user,
   });
   const showRelieverField = shouldShowRelieverField({
@@ -569,7 +608,16 @@ export default function LeaveRequestDetailPage({
     formValues.leave_type &&
     formValues.start_date &&
     formValues.end_date &&
-    (!relieverRequired || !!formValues.cover_person);
+    (!relieverRequired || !!formValues.cover_person) &&
+    (!draftRequiresFile || attachments.length > 0);
+  const canAddAttachment =
+    isHr ||
+    (isOwner && request.status === "DRAFT") ||
+    (isOwner &&
+      PENDING_STATUSES.includes(request.status) &&
+      request.is_emergency &&
+      isSickLeaveType(request.leave_type));
+  const canDeleteAttachment = isOwner && request.status === "DRAFT";
 
   const coverPersonDisplay =
     request.cover_person && typeof request.cover_person === "object"
@@ -602,7 +650,7 @@ export default function LeaveRequestDetailPage({
       start_date: editForm.start_date,
       end_date: editForm.end_date,
       reason: editForm.reason,
-      is_emergency: request.is_emergency,
+      is_emergency: emergencyChecked,
       ...(editForm.cover_person
         ? { cover_person: editForm.cover_person }
         : {}),
@@ -627,11 +675,63 @@ export default function LeaveRequestDetailPage({
     if (!request) return;
     setEditError(null);
     setCoverPersonError(null);
-    const payload = buildDraftPayload(formValues, request.is_emergency);
+    const payload = buildDraftPayload(formValues, emergencyChecked);
+    const emergencyChanged = emergencyChecked !== request.is_emergency;
     saveAndSubmitMutation.mutate({
       submit: payload,
-      patch: editForm ? payload : undefined,
+      patch: editForm || emergencyChanged ? payload : undefined,
     });
+  }
+
+  async function handleUploadFiles(list: FileList | null) {
+    const next = filterLeaveAttachmentFiles(list ?? []);
+    if (!next.files.length) {
+      setAttachmentError(next.error || "Choose a PDF, JPG, PNG, or WEBP file.");
+      return;
+    }
+    const room = LEAVE_ATTACHMENT_MAX_FILES - attachments.length;
+    if (room <= 0) {
+      setAttachmentError("You can attach up to 5 files.");
+      return;
+    }
+    setAttachmentError(next.error);
+    setAttachmentBusy(true);
+    try {
+      for (const file of next.files.slice(0, room)) {
+        await uploadLeaveAttachment(id, file);
+      }
+      await queryClient.invalidateQueries({ queryKey: ["leave-attachments", id] });
+    } catch (err) {
+      setAttachmentError(err instanceof ApiError ? err.message : "Upload failed.");
+    } finally {
+      setAttachmentBusy(false);
+    }
+  }
+
+  async function handleDeleteAttachment(attachmentId: string) {
+    setAttachmentBusy(true);
+    setAttachmentError(null);
+    try {
+      await deleteLeaveAttachment(id, attachmentId);
+      await queryClient.invalidateQueries({ queryKey: ["leave-attachments", id] });
+    } catch (err) {
+      setAttachmentError(err instanceof ApiError ? err.message : "Could not remove the file.");
+    } finally {
+      setAttachmentBusy(false);
+    }
+  }
+
+  async function handleOpenAttachment(
+    attachmentId: string,
+    disposition: "inline" | "attachment",
+    filename: string
+  ) {
+    setAttachmentError(null);
+    try {
+      await openLeaveAttachment(id, attachmentId, disposition, filename);
+    } catch (err) {
+      setAttachmentError(err instanceof ApiError ? err.message : "Could not open the document.");
+    }
   }
 
   function handleOpenHrEdit() {
@@ -823,9 +923,12 @@ export default function LeaveRequestDetailPage({
                       const nextId = e.target.value;
                       setEditForm((f) => {
                         if (!f) return null;
+                        const nextType = leaveTypes.find((t) => t.id === nextId) ?? request.leave_type;
                         const nextRelieverRequired = isRelieverRequired({
                           relieverRequired: draftResolution?.resolved_policy?.reliever_required,
-                          isEmergency: request.is_emergency,
+                          isEmergency:
+                            (emergencyOverride ?? request.is_emergency) &&
+                            !isSickLeaveType(nextType),
                           user,
                         });
                         return {
@@ -921,6 +1024,23 @@ export default function LeaveRequestDetailPage({
                     placeholder="Reason for leave..."
                   />
                 </div>
+                {sickSelected && (
+                  <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-4">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={emergencyChecked}
+                      onChange={(e) => setEmergencyOverride(e.target.checked)}
+                    />
+                    <span className="text-sm">
+                      <span className="font-medium text-foreground">This is an emergency</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Emergency sick leave can be submitted without a document.
+                        You can add the document while the request is still pending.
+                      </span>
+                    </span>
+                  </label>
+                )}
                 <div className="flex flex-wrap gap-2 pt-2">
                   <button
                     type="button"
@@ -1021,6 +1141,24 @@ export default function LeaveRequestDetailPage({
               </div>
             </dl>
 
+            {canEdit && !editForm && sickSelected && (
+              <label className="mt-4 flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-4">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={emergencyChecked}
+                  onChange={(e) => setEmergencyOverride(e.target.checked)}
+                />
+                <span className="text-sm">
+                  <span className="font-medium text-foreground">This is an emergency</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Emergency sick leave can be submitted without a document.
+                    You can add the document while the request is still pending.
+                  </span>
+                </span>
+              </label>
+            )}
+
             {request.is_emergency && (
               <div className="mt-4 flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -1048,6 +1186,84 @@ export default function LeaveRequestDetailPage({
             />
             </>
             )}
+            <div className="mt-6 border-t border-border pt-4">
+              <h3 className="text-xs font-medium text-muted-foreground mb-2">
+                Supporting documents
+              </h3>
+              {attachments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No supporting documents.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {attachments.map((file) => (
+                    <li
+                      key={file.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {file.original_filename}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(file.size)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleOpenAttachment(file.id, "inline", file.original_filename)
+                          }
+                          className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted"
+                        >
+                          View
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleOpenAttachment(file.id, "attachment", file.original_filename)
+                          }
+                          className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted"
+                        >
+                          Download
+                        </button>
+                        {canDeleteAttachment && (
+                          <button
+                            type="button"
+                            disabled={attachmentBusy}
+                            onClick={() => handleDeleteAttachment(file.id)}
+                            className="rounded-lg border border-destructive px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {canAddAttachment && (
+                <div className="mt-3">
+                  <input
+                    type="file"
+                    accept={LEAVE_ATTACHMENT_ACCEPT}
+                    multiple
+                    disabled={attachmentBusy}
+                    onChange={(e) => {
+                      void handleUploadFiles(e.target.files);
+                      e.target.value = "";
+                    }}
+                    className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border file:border-border file:bg-background file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-foreground"
+                  />
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    PDF, JPG, PNG, or WEBP. Up to {LEAVE_ATTACHMENT_MAX_FILES} files, 5 MB each.
+                    {draftRequiresFile ? " This leave type requires at least one document." : ""}
+                  </p>
+                </div>
+              )}
+              {attachmentError && (
+                <p className="mt-2 text-xs text-destructive">{attachmentError}</p>
+              )}
+            </div>
           </div>
 
           <EmployeeLeaveContext

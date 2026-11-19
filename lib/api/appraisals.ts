@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost, ApiError } from "@/lib/api-client";
+import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api-client";
 import type {
   AppraisalCycle,
   AppraisalTemplate,
+  AppraisalTemplateSummary,
+  AppraisalTemplateVersion,
   AppraisalType,
   AppraisalAuditLog,
   EmployeeAppraisalDetail,
@@ -14,6 +16,8 @@ import type {
   FinalizePayload,
   ReopenPayload,
   CreateCyclePayload,
+  DynamicStepPayload,
+  TemplateWritePayload,
 } from "@/lib/types/appraisal";
 
 // ---------------------------------------------------------------------------
@@ -30,6 +34,8 @@ export const appraisalKeys = {
   cycles: () => ["appraisal-cycles"] as const,
   cycleDetail: (id: string) => ["appraisal-cycles", id] as const,
   templates: () => ["appraisal-templates"] as const,
+  template: (id: string) => ["appraisal-templates", id] as const,
+  templateVersions: (id: string) => ["appraisal-templates", id, "versions"] as const,
   types: () => ["appraisal-types"] as const,
 };
 
@@ -120,7 +126,7 @@ export function useAppraisalAuditLogs(id: string) {
 
 export function useSelfSubmit(appraisalId: string) {
   const qc = useQueryClient();
-  return useMutation<EmployeeAppraisalDetail, ApiError, SelfSubmitPayload>({
+  return useMutation<EmployeeAppraisalDetail, ApiError, SelfSubmitPayload | DynamicStepPayload>({
     mutationFn: (payload) =>
       apiPost<EmployeeAppraisalDetail>(
         `appraisals/${appraisalId}/self-submit/`,
@@ -139,7 +145,7 @@ export function useSelfSubmit(appraisalId: string) {
 
 export function useSupervisorSubmit(appraisalId: string) {
   const qc = useQueryClient();
-  return useMutation<EmployeeAppraisalDetail, ApiError, SupervisorSubmitPayload>({
+  return useMutation<EmployeeAppraisalDetail, ApiError, SupervisorSubmitPayload | DynamicStepPayload>({
     mutationFn: (payload) =>
       apiPost<EmployeeAppraisalDetail>(
         `appraisals/${appraisalId}/supervisor-submit/`,
@@ -177,7 +183,7 @@ export function useAppraiseeSignoff(appraisalId: string) {
 
 export function useHrCalibrate(appraisalId: string) {
   const qc = useQueryClient();
-  return useMutation<EmployeeAppraisalDetail, ApiError, HrCalibratePayload>({
+  return useMutation<EmployeeAppraisalDetail, ApiError, HrCalibratePayload | DynamicStepPayload>({
     mutationFn: (payload) =>
       apiPost<EmployeeAppraisalDetail>(
         `appraisals/${appraisalId}/hr-calibrate/`,
@@ -196,7 +202,7 @@ export function useHrCalibrate(appraisalId: string) {
 
 export function useFinalizeAppraisal(appraisalId: string) {
   const qc = useQueryClient();
-  return useMutation<EmployeeAppraisalDetail, ApiError, FinalizePayload>({
+  return useMutation<EmployeeAppraisalDetail, ApiError, FinalizePayload | DynamicStepPayload>({
     mutationFn: (payload) =>
       apiPost<EmployeeAppraisalDetail>(
         `appraisals/${appraisalId}/finalize/`,
@@ -277,9 +283,69 @@ export function useActivateCycle() {
 // ---------------------------------------------------------------------------
 
 export function useAppraisalTemplates() {
-  return useQuery<AppraisalTemplate[]>({
+  return useQuery<AppraisalTemplateSummary[]>({
     queryKey: appraisalKeys.templates(),
-    queryFn: async () => normalizeList<AppraisalTemplate>(await apiGet("appraisal-templates/")),
+    queryFn: async () => normalizeList<AppraisalTemplateSummary>(await apiGet("appraisal-templates/")),
+  });
+}
+
+export function useAppraisalTemplate(id: string) {
+  return useQuery<AppraisalTemplate>({
+    queryKey: appraisalKeys.template(id),
+    queryFn: () => apiGet<AppraisalTemplate>(`appraisal-templates/${id}/`),
+    enabled: !!id,
+  });
+}
+
+export function useTemplateVersions(id: string) {
+  return useQuery<AppraisalTemplateVersion[]>({
+    queryKey: appraisalKeys.templateVersions(id),
+    queryFn: async () =>
+      normalizeList<AppraisalTemplateVersion>(await apiGet(`appraisal-templates/${id}/versions/`)),
+    enabled: !!id,
+  });
+}
+
+export function useCreateTemplate() {
+  const qc = useQueryClient();
+  return useMutation<AppraisalTemplate, ApiError, TemplateWritePayload>({
+    mutationFn: (payload) => apiPost<AppraisalTemplate>("appraisal-templates/", payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: appraisalKeys.templates() });
+    },
+  });
+}
+
+export function useUpdateTemplate(id: string) {
+  const qc = useQueryClient();
+  return useMutation<AppraisalTemplate, ApiError, Partial<TemplateWritePayload>>({
+    mutationFn: (payload) => apiPatch<AppraisalTemplate>(`appraisal-templates/${id}/`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: appraisalKeys.templates() });
+      qc.invalidateQueries({ queryKey: appraisalKeys.template(id) });
+    },
+  });
+}
+
+export function usePublishTemplate(id: string) {
+  const qc = useQueryClient();
+  return useMutation<AppraisalTemplate, ApiError, void>({
+    mutationFn: () => apiPost<AppraisalTemplate>(`appraisal-templates/${id}/publish/`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: appraisalKeys.templates() });
+      qc.invalidateQueries({ queryKey: appraisalKeys.template(id) });
+      qc.invalidateQueries({ queryKey: appraisalKeys.templateVersions(id) });
+    },
+  });
+}
+
+export function useDuplicateTemplate() {
+  const qc = useQueryClient();
+  return useMutation<AppraisalTemplate, ApiError, string>({
+    mutationFn: (id) => apiPost<AppraisalTemplate>(`appraisal-templates/${id}/duplicate/`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: appraisalKeys.templates() });
+    },
   });
 }
 
