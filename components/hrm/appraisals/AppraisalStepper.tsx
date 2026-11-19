@@ -10,10 +10,18 @@ export const APPRAISAL_PHASES = [
   { id: 4, label: "1-on-1 & Sign-off", description: "Phase 4" },
 ] as const;
 
+export type AppraisalPhase = {
+  id: number;
+  label: string;
+  description: string;
+};
+
 interface AppraisalStepperProps {
   activePhase: number;
   onPhaseChange?: (phase: number) => void;
   completedPhases?: number[];
+  lockedPhaseIds?: number[];
+  phases?: AppraisalPhase[];
   className?: string;
 }
 
@@ -21,6 +29,8 @@ export function AppraisalStepper({
   activePhase,
   onPhaseChange,
   completedPhases = [],
+  lockedPhaseIds = [],
+  phases = [...APPRAISAL_PHASES],
   className,
 }: AppraisalStepperProps) {
   return (
@@ -30,18 +40,25 @@ export function AppraisalStepper({
     >
       {/* Mobile: scrollable tabs */}
       <div className="flex gap-1 overflow-x-auto rounded-xl border border-outline-variant bg-surface-container-lowest p-1 sm:hidden">
-        {APPRAISAL_PHASES.map((phase) => {
+        {phases.map((phase) => {
           const isActive = activePhase === phase.id;
           const isDone = completedPhases.includes(phase.id);
+          const locked = lockedPhaseIds.includes(phase.id);
           return (
             <button
               key={phase.id}
-              onClick={() => onPhaseChange?.(phase.id)}
+              onClick={() => {
+                if (locked) return;
+                onPhaseChange?.(phase.id);
+              }}
+              disabled={locked}
+              aria-disabled={locked}
               className={cn(
                 "flex min-w-max flex-1 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
                 isActive
                   ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                locked && "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-muted-foreground"
               )}
             >
               {isDone && !isActive ? (
@@ -66,15 +83,24 @@ export function AppraisalStepper({
 
       {/* Desktop: horizontal step indicator */}
       <div className="hidden sm:flex sm:items-center sm:gap-0">
-        {APPRAISAL_PHASES.map((phase, idx) => {
+        {phases.map((phase, idx) => {
           const isActive = activePhase === phase.id;
           const isDone = completedPhases.includes(phase.id);
-          const isLast = idx === APPRAISAL_PHASES.length - 1;
+          const locked = lockedPhaseIds.includes(phase.id);
+          const isLast = idx === phases.length - 1;
           return (
             <div key={phase.id} className="flex flex-1 items-center">
               <button
-                onClick={() => onPhaseChange?.(phase.id)}
-                className="group flex flex-col items-center gap-1.5 focus-visible:outline-none"
+                type="button"
+                disabled={locked}
+                onClick={() => {
+                  if (locked) return;
+                  onPhaseChange?.(phase.id);
+                }}
+                className={cn(
+                  "group flex flex-col items-center gap-1.5 focus-visible:outline-none",
+                  locked && "cursor-not-allowed opacity-40"
+                )}
               >
                 {/* Circle */}
                 <div

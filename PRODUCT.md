@@ -1,6 +1,8 @@
 # Product
 
+<!-- impeccable:product-schema 1 -->
 
+App-specific record for the Next.js portal. Shared product truth for this monorepo is `../PRODUCT.md`.
 
 ## Platform
 
@@ -26,7 +28,7 @@ Phase 1 core modules:
 
 1. **Leave Management**
 2. **Staff Loan Management**
-3. **Staff Appraisal Management** (not implemented yet; must be factored into information architecture, eligibility, and navigation)
+3. **Staff Appraisal Management** (shipped: My, Team, and All appraisals, HR cycles and templates, four-phase evaluation)
 
 The product exists to:
 
@@ -44,7 +46,7 @@ Later product-of-record modules (not fully shipped, still in scope for design an
 
 This is a **rule-driven internal enterprise system**, not a generic request inbox. Neighboring tools can collect forms; this product’s mechanism is **policy validation before a request can proceed**, plus a **visible multi-stage approval chain** with comments, timestamps, and immutable-enough logs.
 
-Leave working days, relievers, gender-specific types, org-scoped exclusivity, and loan eligibility (confirmed staff, no active loan, tenure and installment caps) are product behavior. Appraisal-gated loan eligibility is specified and must be wired when appraisals ship; the backend currently placeholders that check as always-pass.
+Leave working days, relievers, gender-specific types, org-scoped exclusivity, and loan eligibility (confirmed staff, no active loan, tenure and installment caps) are product behavior. Appraisal-gated loan eligibility is specified; the backend still placeholders that check as always-pass.
 
 ## Operating Context
 
@@ -56,7 +58,7 @@ Internal authenticated web app used during the workday in Nigeria (`Africa/Lagos
 
 **Loan ritual:** draft → submit (confirmed staff only) → optional Line Manager → HR → ED → MD (MD comment required) → HR disburses to ACTIVE and generates a repayment schedule. HR can liquidate, mark installments, or close on resignation. Types are interest-free (Personal, Compassionate). Default max tenure is 12 months. Loan observers get Finance-style visibility without approval power.
 
-**Appraisal ritual (specified, unbuilt):** HR creates a cycle (90-day check, 6-month confirmation, July/December bi-annual). Employee self-appraisal → manager evaluation → weighted KPI + competency score → HR calibration → results visible to the employee. Outcomes may later inform increments, promotions, bonuses, and training needs — and loan eligibility.
+**Appraisal ritual (shipped):** HR publishes a versioned template (organization, department, unit, or team) and opens a cycle (90-day, 6-month, July/December bi-annual). The employee works four phases: Self-Assessment, Performance Ratings, Supervisor Evaluation, then 1-on-1 and sign-off. After appraisee acceptance the request waits on HR calibration, then a management decision, then finalized. HR can reopen for the employee or the supervisor. Outcomes may later inform increments, promotions, bonuses, and training needs — and loan eligibility once that check is wired.
 
 **Notifications:** email plus in-app list and SSE when requests move. Guided tours exist for leave and loans.
 
@@ -64,16 +66,16 @@ Internal authenticated web app used during the workday in Nigeria (`Africa/Lagos
 
 **Shipped in this frontend today**
 
-- Auth (login/register, HTTP-only session cookie via Next API proxy, password change)
+- Auth (login/register, magic link, HTTP-only session cookie via Next API proxy, password change)
 - Leave: apply, history, approvals, calendar, blackouts, reports, delegates/out-of-office, reconciliation, HR settings (types, policies, assignments, workflows, calendars, public holidays, general)
 - Staff loans: apply, history, approvals, reports, settings, disbursement/liquidation/resignation actions, repayment schedule
 - Users, departments, units, teams, roles, personnel
+- Staff appraisals: `/appraisals/me`, `/appraisals/team`, `/appraisals/all`, cycle manager, template builder, and the four-phase detail form
 - Profile, notifications bell/drawer
 - Dark theme toggle in the shell
 
 **Specified and must be factored (unshipped or stubbed)**
 
-- Staff Appraisal Management (`/appraisals` is a coming-soon surface; keep the module tab)
 - Role-based dashboards (`/dashboard` is currently disabled)
 - Payroll viewing and attendance (later modules; leave already records ENCASH ledger rows as a payroll handoff, with no payroll posting API)
 - Appraisal-based loan eligibility (backend TODO)
@@ -84,10 +86,11 @@ Internal authenticated web app used during the workday in Nigeria (`Africa/Lagos
 - Access is role-scoped. Confidential PII. Audit logs on approvals, rejections, comments, and HR edits.
 - Leave status vocabulary: `DRAFT`, `PENDING_TEAM_LEAD`, `PENDING_SUPERVISOR`, `PENDING_MANAGER`, `PENDING_HR`, `PENDING_ED`, `APPROVED`, `REJECTED`, `CANCELLED`.
 - Loan status vocabulary: `DRAFT`, `PENDING_MANAGER`, `PENDING_HR`, `PENDING_ED`, `PENDING_MD`, `APPROVED`, `REJECTED`, `ACTIVE`, `CLOSED`, `LIQUIDATED`.
+- Appraisal status vocabulary: `NOT_STARTED`, `DRAFT`, `SELF_SUBMITTED`, `PENDING_APPRAISEE_ACCEPTANCE`, `PENDING_HR_CALIBRATION`, `PENDING_MANAGEMENT_DECISION`, `FINALIZED`, `REOPENED_FOR_EMPLOYEE`, `REOPENED_FOR_SUPERVISOR`.
 - Half-day leave is not a Phase 1 leave policy (PRD). No carry-forward unless a later policy setting says otherwise.
 - Reports must be exportable (PRD).
 - Do not invent a multi-tenant or multi-company UX; this is Incel Group only unless product scope changes.
-- Do not ship a public marketing site as the product; unauthenticated surfaces are login/register only.
+- Do not ship a public marketing site as the product; unauthenticated surfaces are login, register, and magic link only.
 
 **Open**
 
@@ -122,7 +125,7 @@ Internal authenticated web app used during the workday in Nigeria (`Africa/Lagos
 2. **The chain is the interface.** Approvers, stage, comments, and next action must be obvious on every request.
 3. **One portal, two jobs.** Self-service and HR operations share a shell; roles change what you can see and do, not the product’s identity.
 4. **Confidential by construction.** Employee data, loans, and appraisals are access-controlled and auditable.
-5. **Design for the unbuilt Phase 1.** Appraisals, dashboards, payroll viewing, and attendance must fit the same IA and visual world instead of arriving as a second product.
+5. **One product as modules land.** Dashboards, payroll viewing, and attendance must fit the same IA and visual world. Appraisals already do.
 
 
 

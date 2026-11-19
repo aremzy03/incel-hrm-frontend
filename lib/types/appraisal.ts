@@ -66,30 +66,99 @@ export interface AppraisalType {
 
 export interface AppraisalQuestion {
   id: string;
-  section: string; // UUID of AppraisalSection
+  section: string;
   prompt: string;
   description: string;
   order: number;
+  response_type?: QuestionResponseType;
+  counts_toward_score?: boolean;
+  required?: boolean;
+  weight?: string | null;
+  options?: string[];
 }
+
+export type QuestionResponseType =
+  | "RATING"
+  | "SHORT_TEXT"
+  | "LONG_TEXT"
+  | "YES_NO"
+  | "MULTI_SELECT";
+
+export type SectionKind = "SCORED" | "INFORMATIONAL_RATING" | "NARRATIVE" | "CHECKBOX";
+
+export type SectionAudience = "EMPLOYEE" | "SUPERVISOR" | "BOTH" | "HR" | "MANAGEMENT";
+
+export type TemplateScope = "ORG" | "DEPARTMENT" | "UNIT" | "TEAM" | "";
 
 export interface AppraisalSection {
   id: string;
-  template: string; // UUID of AppraisalTemplate
+  template?: string;
+  version?: string;
   title: string;
-  section_code: string; // e.g. "SECTION_A"
-  weight: string; // Decimal string e.g. "15.00"
-  rating_scale_max: number; // 4 or 5
+  section_code: string;
+  kind?: SectionKind;
+  audience?: SectionAudience;
+  weight: string;
+  rating_scale_max: number;
   order: number;
   questions: AppraisalQuestion[];
+}
+
+export interface AppraisalPhase {
+  id: string;
+  title: string;
+  order: number;
+  sections: AppraisalSection[];
+}
+
+export interface AppraisalTemplateVersion {
+  id: string;
+  version_number: number;
+  status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+  published_at: string | null;
+  phases?: AppraisalPhase[];
+  sections: AppraisalSection[];
 }
 
 export interface AppraisalTemplate {
   id: string;
   title: string;
-  department_name?: string;
+  description?: string;
+  appraisal_type?: string;
   appraisal_type_name: string;
-  description: string;
+  department?: string | null;
+  department_name?: string | null;
+  unit?: string | null;
+  unit_name?: string | null;
+  team?: string | null;
+  team_name?: string | null;
+  scope?: TemplateScope;
+  assignment_locked?: boolean;
+  is_active?: boolean;
   sections: AppraisalSection[];
+  draft?: AppraisalTemplateVersion | null;
+  published?: AppraisalTemplateVersion | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AppraisalTemplateSummary {
+  id: string;
+  title: string;
+  description: string;
+  appraisal_type: string;
+  appraisal_type_name: string;
+  scope: TemplateScope;
+  department: string | null;
+  department_name: string | null;
+  unit: string | null;
+  unit_name: string | null;
+  team: string | null;
+  team_name: string | null;
+  is_active: boolean;
+  has_draft: boolean;
+  published_version_number: number | null;
+  updated_at: string;
 }
 
 // ─── Per-Question Answers ────────────────────────────────────────────────────
@@ -100,6 +169,8 @@ export interface AppraisalQuestionAnswer {
   question_prompt: string;
   section_id: string;
   section_code: string;
+  respondent?: "EMPLOYEE" | "SUPERVISOR" | "HR" | "MANAGEMENT";
+  value?: string | number | boolean | string[] | null;
   self_rating: number | null;
   supervisor_rating: number | null;
   comments: string;
@@ -159,12 +230,16 @@ export interface EmployeeAppraisalDetail {
     submission_deadline: string;
   };
   template: AppraisalTemplate;
+  template_version?: string | null;
+  form?: AppraisalTemplateVersion | null;
   status: AppraisalStatusCode;
   status_display: string;
   /** Decimal string e.g. "90.00" */
   self_score_total: string;
   /** Decimal string e.g. "90.00" */
   supervisor_score_total: string;
+  official_score?: string;
+  score_is_provisional?: boolean;
   performance_category: PerformanceCategoryCode | null;
   phase1_self: AppraisalSelfPhase1 | null;
   answers: AppraisalQuestionAnswer[];
@@ -176,6 +251,7 @@ export interface EmployeeAppraisalDetail {
   hr_reviewed_at: string | null;
   finalized_at: string | null;
   created_at: string;
+  phase_submissions?: { id: string; phase: string; respondent: string; submitted_at: string }[];
 }
 
 /** Lightweight summary returned by list endpoints */
@@ -261,6 +337,56 @@ export interface FinalizePayload {
 export interface ReopenPayload {
   target_stage: "REOPENED_FOR_EMPLOYEE" | "REOPENED_FOR_SUPERVISOR";
   reason: string;
+}
+
+export interface DynamicAnswerPayload {
+  question_id: string;
+  value: string | number | boolean | string[] | null;
+}
+
+export interface DynamicStepPayload {
+  answers: DynamicAnswerPayload[];
+  is_draft: boolean;
+  phase_id?: string;
+}
+
+export interface TemplateQuestionDraft {
+  prompt: string;
+  description: string;
+  response_type: QuestionResponseType;
+  counts_toward_score: boolean;
+  required: boolean;
+  weight: string | null;
+  options: string[];
+  order?: number;
+}
+
+export interface TemplateSectionDraft {
+  title: string;
+  section_code: string;
+  kind: SectionKind;
+  audience: SectionAudience;
+  weight: string;
+  rating_scale_max: number;
+  order?: number;
+  questions: TemplateQuestionDraft[];
+}
+
+export interface TemplatePhaseDraft {
+  title: string;
+  sections: TemplateSectionDraft[];
+}
+
+export interface TemplateWritePayload {
+  title: string;
+  description?: string;
+  appraisal_type: string;
+  scope?: TemplateScope;
+  department?: string | null;
+  unit?: string | null;
+  team?: string | null;
+  phases?: TemplatePhaseDraft[];
+  sections?: TemplateSectionDraft[];
 }
 
 export interface CreateCyclePayload {
